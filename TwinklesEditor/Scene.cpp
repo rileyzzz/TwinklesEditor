@@ -7,6 +7,8 @@ bool keyboard_d = false;
 bool keyboard_q = false;
 bool keyboard_e = false;
 
+TwinklesSystem* ActiveSystem = nullptr;
+
 void Scene::InitGL()
 {
 	glGenFramebuffers(1, &fbo);
@@ -20,7 +22,6 @@ void Scene::InitGL()
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
-
 	//depth/stencil renderbuffer
 	
 	glGenRenderbuffers(1, &rbo);
@@ -64,6 +65,7 @@ void Scene::InitGL()
 Scene::~Scene()
 {
 	glDeleteFramebuffers(1, &fbo);
+	delete ActiveSystem;
 }
 
 void Scene::Keyboard(SDL_KeyboardEvent keyevent, bool state)
@@ -186,8 +188,66 @@ void Scene::ResizeScene(int inWidth, int inHeight)
 	glBindRenderbuffer(GL_RENDERBUFFER, 0);
 }
 
-void Scene::Render()
+uint32_t Scene::FirstUnusedParticle()
 {
+	static uint32_t lastUsed = 0;
+
+	for (uint32_t i = lastUsed; i < particleCount; i++)
+	{
+		if (particles[i].Life <= 0.0f)
+		{
+			lastUsed = i;
+			return i;
+		}
+	}
+
+	//linear search
+	for (uint32_t i = 0; i < lastUsed; i++)
+	{
+		if (particles[i].Life <= 0.0f)
+		{
+			lastUsed = i;
+			return i;
+		}
+	}
+
+	lastUsed = 0;
+	return 0;
+}
+
+#define randfloat() ((float)std::rand() / (float)RAND_MAX - 0.5f) * 2.0f
+void Scene::ParticleRespawn(RenderParticle& particle)
+{
+	//float random = (float)std::rand() / (float)RAND_MAX;
+
+
+	float rColor = 0.5f + ((rand() % 100) / 100.0f);
+	particle.Position = glm::vec3(0.0f, 0.0f, 0.0f);
+	particle.Color = glm::vec4(rColor, rColor, rColor, 1.0f);
+	particle.Life = 1.0f;
+	particle.Velocity = glm::vec3(randfloat() * 1.0f, randfloat() * 1.0f, randfloat() * 2.0f);
+}
+
+void Scene::Render(float deltaTime)
+{
+	//Spawn new particles
+	uint32_t rate = 2;
+	for (uint32_t i = 0; i < rate; i++)
+	{
+		uint32_t FirstUnused = FirstUnusedParticle();
+		ParticleRespawn(particles[FirstUnused]);
+	}
+
+	//Update particles
+	for (auto& particle : particles)
+	{
+		particle.Life -= deltaTime;
+		if (particle.Life > 0.0f)
+		{
+			particle.Position += particle.Velocity * deltaTime;
+		}
+	}
+
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glClearColor(5 / (double)255, 5 / (double)255, 5 / (double)255, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -220,8 +280,27 @@ void Scene::Render()
 
 	DrawGrid();
 
+	glColor3f(0.8, 0.8, 0.8);
+	glBegin(GL_POINTS);
+	for (const auto& particle : particles)
+	{
+		glVertex3fv(glm::value_ptr(particle.Position));
+	}
+	glEnd();
+
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Scene::OpenFile(const char* path)
+{
+	delete ActiveSystem;
+	ActiveSystem = new TwinklesSystem(path);
+}
+
+void Scene::ExportFile(const char* path)
+{
+
 }

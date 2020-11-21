@@ -179,5 +179,6 @@ private:
 public:
 	TwinklesSystem(const char* filepath);
 	void Export(const char* filepath);
+	TwinklesSystem() {}
 };
 

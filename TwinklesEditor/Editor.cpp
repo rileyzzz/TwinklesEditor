@@ -34,13 +34,15 @@ Editor::Editor(int argc, char** argv)
 	ImFontConfig config;
 	config.OversampleH = 3;
 	config.OversampleV = 1;
-	auto MainFont = io.Fonts->AddFontFromFileTTF((ApplicationDir.string() + "/CascadiaCode.ttf").c_str(), 16.0f, &config);
+	auto MainFont = io.Fonts->AddFontFromFileTTF((ApplicationDir.string() + "/Roboto-Regular.ttf").c_str(), 18.0f, &config);
 
 
 	ImGui_ImplSDL2_InitForOpenGL(window, glcontext);
 	ImGui_ImplOpenGL3_Init();
 
 	ParticleScene = new Scene;
+
+	ParticleScene->InitGL();
 
 	//MyContext = new LibGLContext(wglGetCurrentDC(), wglGetCurrentContext());
 	int close = 0;
@@ -108,7 +110,7 @@ Editor::Editor(int argc, char** argv)
 		ImGui::NewFrame();
 
 		//// Frame logic here...
-
+		
 		ImGui::SetNextWindowPos(ImVec2(0, 0));
 		ImGui::SetNextWindowSize(io.DisplaySize);
 		ImGui::Begin("Content", nullptr,
@@ -127,7 +129,7 @@ Editor::Editor(int argc, char** argv)
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-		ParticleScene->Render();
+		ParticleScene->Render(io.DeltaTime);
 
 		SDL_GL_SwapWindow(window);
 
@@ -165,7 +167,7 @@ void Editor::Draw()
 				ofn.lpstrFile = szFile;
 				ofn.lpstrFile[0] = '\0';
 				ofn.nMaxFile = sizeof(szFile);
-				ofn.lpstrFilter = "Twinkles PFX (*.tfx)\0*.im\0All Files (*.*)\0*.*\0";
+				ofn.lpstrFilter = "Twinkles PFX (*.tfx)\0*.tfx\0All Files (*.*)\0*.*\0";
 				ofn.nFilterIndex = 1;
 				ofn.lpstrFileTitle = NULL;
 				ofn.nMaxFileTitle = 0;
@@ -174,6 +176,7 @@ void Editor::Draw()
 				if (GetOpenFileNameA(&ofn))
 				{
 					//LoadMesh(szFile);
+					ParticleScene->OpenFile(szFile);
 				}
 			}
 			ImGui::EndMenu();
