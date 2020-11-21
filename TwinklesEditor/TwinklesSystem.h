@@ -1,4 +1,7 @@
 #pragma once
+#include <map>
+#include <glm/glm.hpp>
+#include <glm/ext.hpp>
 #include "IOArchive.h"
 
 enum class ParticleType : uint32_t
@@ -45,6 +48,14 @@ struct Vector2
 		out << vec.DebugString();
 		return out;
 	}
+
+	Vector2(float InX, float InY) : x(InX), y(InY) { }
+	Vector2() { }
+
+	glm::vec2 ToGLM()
+	{
+		return glm::vec2(x, y);
+	}
 };
 
 struct Vector3
@@ -68,6 +79,14 @@ struct Vector3
 	{
 		out << vec.DebugString();
 		return out;
+	}
+
+	Vector3(float InX, float InY, float InZ) : x(InX), y(InY), z(InZ) { }
+	Vector3() { }
+
+	glm::vec3 ToGLM()
+	{
+		return glm::vec3(x, y, z);
 	}
 };
 
@@ -104,45 +123,100 @@ struct Color
 		out << col.DebugString();
 		return out;
 	}
-};
 
-template <class T>
-struct Keyframe
-{
-public:
-	float Key;
-	T Value;
-	friend IOArchive& operator<<(IOArchive& Ar, Keyframe& frame)
+	Color(uint8_t InR, uint8_t InG, uint8_t InB, uint8_t InA) : r(InR), g(InG), b(InB), a(InA) { }
+	Color() { }
+
+	glm::vec4 ToGLM()
 	{
-		Ar << frame.Key;
-		Ar << frame.Value;
-		return Ar;
+		return glm::vec4((float)r / 255.0f, (float)g / 255.0f, (float)b / 255.0f, (float)a / 255.0f);
 	}
 };
+
+//template <class T>
+//struct Keyframe
+//{
+//public:
+//	//float Key;
+//	T Value;
+//	friend IOArchive& operator<<(IOArchive& Ar, Keyframe& frame)
+//	{
+//		//Ar << frame.Key;
+//		Ar << frame.Value;
+//		return Ar;
+//	}
+//};
 
 template <class T>
 class KeyframeTrack
 {
 public:
-	std::vector<Keyframe<T>> Frames;
+	//std::vector<Keyframe<T>> Frames;
+	std::map<float, T> Frames;
 	bool Serialize(IOArchive& Ar)
 	{
 		uint32_t FrameNum = Frames.size();
 		Ar << FrameNum;
-		if (Ar.IsLoading()) Frames.resize(FrameNum);
+		//if (Ar.IsLoading()) Frames.resize(FrameNum);
 		std::cout << FrameNum << " frames:\n";
-		for (int i = 0; i < FrameNum; i++)
+		if (Ar.IsLoading())
 		{
-			Keyframe<T>& Frame = Frames[i];
-			Ar << Frame;
-			std::cout << Frame.Key << ": " << Frame.Value << "\n";
+			Frames.clear();
+			for (int i = 0; i < FrameNum; i++)
+			{
+				float key = 0.0f;
+				T value;
+				Ar << key;
+				Ar << value;
+				Frames[key] = value;
+				std::cout << key << ": " << value << "\n";
+			}
+		}
+		else
+		{
+			for (auto& Frame : Frames)
+			{
+				float key = Frame.first;
+				T value = Frame.second;
+				Ar << key;
+				Ar << value;
+			}
 		}
 		return true;
 	}
+
+	std::pair<float, T> GetLastFrame(float time)
+	{
+		std::pair<float, T> closest = *Frames.begin();
+		for (auto& Frame : Frames)
+		{
+			float distance = Frame.first - time;
+			if (distance > 0.0f)
+			{
+				return closest;
+			}
+			closest = Frame;
+		}
+	}
+	std::pair<float, T> GetNextFrame(float time)
+	{
+		for (auto& Frame : Frames)
+		{
+			float distance = Frame.first - time;
+			if (distance > 0.0f)
+			{
+				return Frame;
+			}
+		}
+		return *Frames.rbegin();
+	}
+
+	T GetKey(float time);
 };
 
 class Emitter
 {
+public:
 	KUID TextureKUID;
 	Vector3 Position;
 	Quaternion Rotation;
@@ -165,8 +239,11 @@ class Emitter
 	KeyframeTrack<float> WindFactor;
 	Vector3 VelocityDampening;
 
-public:
-	bool Serialize(IOArchive& Ar);
+
+	bool Serialize(IOArchive& Ar, uint32_t Version);
+
+	//float GetFloatKey(float time, KeyframeTrack<float>& Track);
+	//Vector3 GetVectorKey(float time, KeyframeTrack<Vector3>& Track);
 };
 
 class TwinklesSystem
@@ -181,4 +258,3 @@ public:
 	void Export(const char* filepath);
 	TwinklesSystem() {}
 };
-

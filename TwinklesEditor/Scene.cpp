@@ -7,7 +7,7 @@ bool keyboard_d = false;
 bool keyboard_q = false;
 bool keyboard_e = false;
 
-TwinklesSystem* ActiveSystem = nullptr;
+//TwinklesSystem* ActiveSystem = nullptr;
 
 void Scene::InitGL()
 {
@@ -65,7 +65,7 @@ void Scene::InitGL()
 Scene::~Scene()
 {
 	glDeleteFramebuffers(1, &fbo);
-	delete ActiveSystem;
+	//delete ActiveSystem;
 }
 
 void Scene::Keyboard(SDL_KeyboardEvent keyevent, bool state)
@@ -188,7 +188,7 @@ void Scene::ResizeScene(int inWidth, int inHeight)
 	glBindRenderbuffer(GL_RENDERBUFFER, 0);
 }
 
-uint32_t Scene::FirstUnusedParticle()
+uint32_t RenderEmitter::FirstUnusedParticle()
 {
 	static uint32_t lastUsed = 0;
 
@@ -216,19 +216,23 @@ uint32_t Scene::FirstUnusedParticle()
 }
 
 #define randfloat() ((float)std::rand() / (float)RAND_MAX - 0.5f) * 2.0f
-void Scene::ParticleRespawn(RenderParticle& particle)
+void RenderEmitter::ParticleRespawn(RenderParticle& particle)
 {
 	//float random = (float)std::rand() / (float)RAND_MAX;
 
-
-	float rColor = 0.5f + ((rand() % 100) / 100.0f);
-	particle.Position = glm::vec3(0.0f, 0.0f, 0.0f);
-	particle.Color = glm::vec4(rColor, rColor, rColor, 1.0f);
+	particle.Position = SourceEmitter.Position.ToGLM();
+	particle.Color = SourceEmitter.Color.GetKey(0.0f).ToGLM();
 	particle.Life = 1.0f;
-	particle.Velocity = glm::vec3(randfloat() * 1.0f, randfloat() * 1.0f, randfloat() * 2.0f);
+	//z is fixed, x and y vary
+	glm::vec3 VelocityCone = SourceEmitter.VelocityCone.GetKey(0.0f).ToGLM();
+	VelocityCone.x *= randfloat();
+	VelocityCone.y *= randfloat();
+	particle.Velocity = VelocityCone;
+
+	
 }
 
-void Scene::Render(float deltaTime)
+void RenderEmitter::EmitterTick(float deltaTime)
 {
 	//Spawn new particles
 	uint32_t rate = 2;
@@ -238,15 +242,42 @@ void Scene::Render(float deltaTime)
 		ParticleRespawn(particles[FirstUnused]);
 	}
 
+	float Lifetime = SourceEmitter.Lifetime.GetKey(0.0f);
+
 	//Update particles
 	for (auto& particle : particles)
 	{
-		particle.Life -= deltaTime;
+		particle.Life -= deltaTime / Lifetime;
 		if (particle.Life > 0.0f)
 		{
+			particle.Velocity.z -= SourceEmitter.Gravity.GetKey(1.0f - particle.Life) / 40.0f;
 			particle.Position += particle.Velocity * deltaTime;
+			particle.Color = SourceEmitter.Color.GetKey(1.0f - particle.Life).ToGLM();
 		}
 	}
+}
+
+void RenderEmitter::DrawParticles()
+{
+	glColor3f(0.8, 0.8, 0.8);
+	//glBegin(GL_POINTS);
+	
+	//std::cout << "color " << particles[0].Color.r << " " << particles[0].Color.g << " " << particles[0].Color.b << " " << particles[0].Color.a << "\n";
+	for (const auto& particle : particles)
+	{
+		glColor4fv(glm::value_ptr(particle.Color));
+		glBegin(GL_POINTS);
+		glVertex3fv(glm::value_ptr(particle.Position));
+		glEnd();
+	}
+	//glEnd();
+}
+
+void Scene::Render(float deltaTime)
+{
+
+	for (auto& emitter : Emitters)
+		emitter.EmitterTick(deltaTime);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	glClearColor(5 / (double)255, 5 / (double)255, 5 / (double)255, 0.0f);
@@ -280,13 +311,8 @@ void Scene::Render(float deltaTime)
 
 	DrawGrid();
 
-	glColor3f(0.8, 0.8, 0.8);
-	glBegin(GL_POINTS);
-	for (const auto& particle : particles)
-	{
-		glVertex3fv(glm::value_ptr(particle.Position));
-	}
-	glEnd();
+	for (auto& emitter : Emitters)
+		emitter.DrawParticles();
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
@@ -296,8 +322,12 @@ void Scene::Render(float deltaTime)
 
 void Scene::OpenFile(const char* path)
 {
-	delete ActiveSystem;
-	ActiveSystem = new TwinklesSystem(path);
+	//delete ActiveSystem;
+	//ActiveSystem = new TwinklesSystem(path);
+	ActiveSystem = TwinklesSystem(path);
+
+	for(auto& emitter : ActiveSystem.Emitters)
+		Emitters.emplace_back(emitter);
 }
 
 void Scene::ExportFile(const char* path)

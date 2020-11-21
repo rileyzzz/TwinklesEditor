@@ -43,7 +43,7 @@ Editor::Editor(int argc, char** argv)
 	ParticleScene = new Scene;
 
 	ParticleScene->InitGL();
-
+	ParticleScene->ResizeScene(1024, 1024);
 	//MyContext = new LibGLContext(wglGetCurrentDC(), wglGetCurrentContext());
 	int close = 0;
 	while (!close)

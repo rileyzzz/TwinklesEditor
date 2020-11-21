@@ -25,7 +25,7 @@ bool TwinklesSystem::Serialize(IOArchive& Ar)
 {
 	if (!Ar.ChunkHeader("XFPT")) return false;
 	Ar << Version;
-	if (Version != 105)
+	if (Version != 104 && Version != 105)
 	{
 		std::cout << "Unsupported particle version " << Version << "\n";
 		return false;
@@ -38,13 +38,13 @@ bool TwinklesSystem::Serialize(IOArchive& Ar)
 	{
 		std::cout << "Emitter " << Fx << "\n";
 		Emitter& Emit = Emitters[Fx];
-		Emit.Serialize(Ar);
+		Emit.Serialize(Ar, Version);
 	}
 
 	return true;
 }
 
-bool Emitter::Serialize(IOArchive& Ar)
+bool Emitter::Serialize(IOArchive& Ar, uint32_t Version)
 {
 	if (!Ar.ChunkHeader("XFTS")) return false;
 	Ar << TextureKUID;
@@ -105,7 +105,82 @@ bool Emitter::Serialize(IOArchive& Ar)
 	std::cout << "Wind Factor:\n";
 	WindFactor.Serialize(Ar);
 
-	Ar << VelocityDampening;
+	if(Version > 104) Ar << VelocityDampening;
+
 	if (!Ar.ChunkHeader("XFDE")) return false;
 	return true;
 }
+
+float lerp(float a, float b, float f)
+{
+	return a + f * (b - a);
+}
+
+Vector2 lerp(const Vector2& a, const Vector2& b, float f)
+{
+	return Vector2(lerp(a.x, b.x, f), lerp(a.y, b.y, f));
+}
+
+Vector3 lerp(const Vector3& a, const Vector3& b, float f)
+{
+	return Vector3(lerp(a.x, b.x, f), lerp(a.y, b.y, f), lerp(a.z, b.z, f));
+}
+
+Color lerp(const Color& a, const Color& b, float f)
+{
+	return Color(lerp((float)a.r, (float)b.r, f),
+				 lerp((float)a.g, (float)b.g, f),
+				 lerp((float)a.b, (float)b.b, f),
+				 lerp((float)a.a, (float)b.a, f));
+}
+
+//float Emitter::GetFloatKey(float time, KeyframeTrack<float>& Track)
+//{
+	//auto Start = Track.Frames.lower_bound(time);
+	//auto End = Track.Frames.upper_bound(time);
+
+	//float StartKey = Start->first;
+	//float EndKey = End->first;
+	//auto& StartFrame = Start->second;
+	//auto& EndFrame = End->second;
+
+	//float Along = (time - StartKey) / (EndKey - StartKey);
+	//return lerp(StartFrame, EndFrame, Along);
+//}
+//
+//Vector3 Emitter::GetVectorKey(float time, KeyframeTrack<Vector3>& Track)
+//{
+//	return Vector3();
+//}
+
+
+template<class T>
+T KeyframeTrack<T>::GetKey(float time)
+{
+	//auto Start = Frames.lower_bound(time);
+	//auto End = Frames.upper_bound(time);
+	auto Start = GetLastFrame(time);
+	auto End = GetNextFrame(time);
+
+	float StartKey = Start.first;
+	float EndKey = End.first;
+	auto& StartFrame = Start.second;
+	auto& EndFrame = End.second;
+
+	//prevent divide by zero
+	if (EndKey == StartKey)
+		EndKey += 0.01f;
+
+	//std::cout << "time " << time << ":\n";
+	//std::cout << "start " << StartKey << ": " << StartFrame << "\n";
+	//std::cout << "end " << EndKey << ": " << EndFrame << "\n";
+
+	float Along = (time - StartKey) / (EndKey - StartKey);
+	return lerp(StartFrame, EndFrame, Along);
+}
+
+//explicit instantiation
+template class KeyframeTrack<float>;
+template class KeyframeTrack<Vector2>;
+template class KeyframeTrack<Vector3>;
+template class KeyframeTrack<Color>;
