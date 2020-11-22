@@ -1,4 +1,6 @@
 #include "Scene.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 bool keyboard_w = false;
 bool keyboard_a = false;
@@ -72,7 +74,8 @@ void Scene::InitGL()
 	glEnable(GL_MULTISAMPLE);
 
 	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
 	//glm::vec3 camPos(10.0f, 10.0f, 10.0f);
 	//glm::vec3 camTarget(0.0f, 0.0f, 0.0f);
@@ -221,6 +224,16 @@ RenderEmitter::RenderEmitter(Emitter& emit, Scene* InScene) : SourceEmitter(emit
 {
 	particleShader = parentScene->particleShader;
 
+	KUID& TexKUID = SourceEmitter.TextureKUID;
+	if (TexKUID.UserID == -1 && TexKUID.ContentID == 6329)
+		SetTexture((parentScene->Directory + "/assets/steam.tga").c_str());
+	else if (TexKUID.UserID == -1 && TexKUID.ContentID == 6330)
+		SetTexture((parentScene->Directory + "/assets/smoke.tga").c_str());
+	else if (TexKUID.UserID == -1 && TexKUID.ContentID == 6339)
+		SetTexture((parentScene->Directory + "/assets/spark.tga").c_str());
+	else
+		SetTexture((parentScene->Directory + "/assets/unknown.tga").c_str());
+
 	for (unsigned int i = 0; i < particleCount; ++i)
 		particles.push_back(RenderParticle());
 
@@ -250,10 +263,18 @@ RenderEmitter::RenderEmitter(Emitter& emit, Scene* InScene) : SourceEmitter(emit
 	glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Color));
 	//glVertexAttribDivisor(2, 1);
 
-	//life
+	//size
 	glEnableVertexAttribArray(3);
-	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Life));
+	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Size));
+
+	//life
+	glEnableVertexAttribArray(4);
+	glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Life));
 	//glVertexAttribDivisor(3, 1);
+
+	//random
+	glEnableVertexAttribArray(5);
+	glVertexAttribPointer(5, 1, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Rand));
 
 	////transform
 	//constexpr std::size_t vec4size = sizeof(glm::vec4);
@@ -316,6 +337,7 @@ uint32_t RenderEmitter::FirstUnusedParticle()
 void RenderEmitter::ParticleRespawn(RenderParticle& particle)
 {
 	//float random = (float)std::rand() / (float)RAND_MAX;
+	particle.Rand = (float)std::rand() / (float)RAND_MAX;
 
 	particle.Position = SourceEmitter.Position.ToGLM();
 	//particle.Transform = glm::mat4();
@@ -328,25 +350,64 @@ void RenderEmitter::ParticleRespawn(RenderParticle& particle)
 	VelocityCone.y *= randfloat();
 	particle.Velocity = VelocityCone;
 
-	
+	//size_control*(max_size-min_size) + size_control*size_variance
+	float size_control = SourceEmitter.Size.GetKey(0.0f);
+	glm::vec2 MinMax = SourceEmitter.SizeRange.GetKey(0.0f).ToGLM();
+	float min_size = MinMax.x;
+	float max_size = MinMax.y;
+	float size_variance = SourceEmitter.SizeVariance.GetKey(0.0f) * particle.Rand;
+	particle.Size = size_control * (max_size - min_size) + size_control * size_variance;
+}
+
+void RenderEmitter::SetTexture(const char* path)
+{
+	if (TextureLoaded)
+		glDeleteTextures(1, &SpriteTex);
+
+	TextureLoaded = true;
+	glGenTextures(1, &SpriteTex);
+	int width, height, nrComponents;
+	uint8_t* data = stbi_load(path, &width, &height, &nrComponents, 0);
+
+	GLenum format = GL_RGBA;
+	if (nrComponents == 1)
+		format = GL_RED;
+	else if (nrComponents == 3)
+		format = GL_RGB;
+	else if (nrComponents == 4)
+		format = GL_RGBA;
+
+	glBindTexture(GL_TEXTURE_2D, SpriteTex);
+	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	stbi_image_free(data);
 }
 
 void RenderEmitter::EmitterTick(float deltaTime)
 {
 	//Spawn new particles
-	uint32_t rate = 2;
-	for (uint32_t i = 0; i < rate; i++)
+	particleAccumulator += deltaTime;
+	const float SecondsPerParticle = 1.0f / SourceEmitter.EmissionRate.GetKey(0.0f);
+	while(particleAccumulator > SecondsPerParticle) //seconds / particle
 	{
+		particleAccumulator -= SecondsPerParticle;
+
 		uint32_t FirstUnused = FirstUnusedParticle();
 		ParticleRespawn(particles[FirstUnused]);
 	}
 
 	float Lifetime = SourceEmitter.Lifetime.GetKey(0.0f);
+	float LifetimeVariance = SourceEmitter.LifetimeVariance.GetKey(0.0f);
 
 	//Update particles
 	for (auto& particle : particles)
 	{
-		particle.Life -= deltaTime / Lifetime;
+		particle.Life -= deltaTime / (Lifetime + LifetimeVariance * ((particle.Rand - 0.5f) * 2.0f));
 		if (particle.Life > 0.0f)
 		{
 			particle.Velocity.z -= SourceEmitter.Gravity.GetKey(1.0f - particle.Life) / 40.0f;
@@ -354,20 +415,43 @@ void RenderEmitter::EmitterTick(float deltaTime)
 			//particle.
 			particle.Position += particle.Velocity * deltaTime;
 			particle.Color = SourceEmitter.Color.GetKey(1.0f - particle.Life).ToGLM();
+
+			float size_control = SourceEmitter.Size.GetKey(1.0f - particle.Life);
+			//0 on purpose
+			glm::vec2 MinMax = SourceEmitter.SizeRange.GetKey(0.0f).ToGLM();
+			float min_size = MinMax.x;
+			float max_size = MinMax.y;
+			//0 on purpose
+			float size_variance = SourceEmitter.SizeVariance.GetKey(0.0f) * particle.Rand; // * randfloat()
+
+			particle.Size = size_control * (max_size - min_size) + size_control * size_variance;
 		}
 	}
 }
 
 void RenderEmitter::DrawParticles()
 {
-	glColor3f(0.8, 0.8, 0.8);
+	//glColor3f(0.8, 0.8, 0.8);
 	//glBegin(GL_POINTS);
 	
 	//std::cout << "color " << particles[0].Color.r << " " << particles[0].Color.g << " " << particles[0].Color.b << " " << particles[0].Color.a << "\n";
 
+	//sort particles array for transparency
+	//glm::mat4 inverse = glm::inverse(parentScene->view);
+	//glm::vec3 camerapos = glm::vec3(inverse[3]); // / inverse[3].w
+	//std::map<float, RenderParticle> sorted;
+	//for (auto& particle : particles)
+	//{
+	//	float distance = glm::length(particle.Position - camerapos);
+	//	sorted[distance] = particle;
+	//}
+	//std::vector<RenderParticle> FinalArray;
+	//for (auto& particle : sorted)
+	//	FinalArray.push_back(particle.second);
 
 	glBindBuffer(GL_ARRAY_BUFFER, EmitterVBO);
 	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(RenderParticle) * particleCount, &particles[0]);
+	//glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(RenderParticle) * FinalArray.size(), &FinalArray[0]);
 
 	//glm::mat4 modelview;
 	//glm::mat4 proj;
@@ -382,12 +466,13 @@ void RenderEmitter::DrawParticles()
 	particleShader->setMat4("view", parentScene->view);
 	particleShader->setMat4("projection", parentScene->projection);
 
+	glBindTexture(GL_TEXTURE_2D, SpriteTex);
 	glBindVertexArray(EmitterVAO);
 	//glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, particleCount);
 	//glDrawArraysInstanced(GL_POINTS, 0, 1, particleCount);
 	glDrawArrays(GL_POINTS, 0, particleCount);
 	glBindVertexArray(0);
-
+	glBindTexture(GL_TEXTURE_2D, 0);
 	//glBegin(GL_POINTS);
 	//for (const auto& particle : particles)
 	//{
@@ -448,9 +533,10 @@ void Scene::Render(float deltaTime)
 
 	DrawGrid();
 
+	glDepthMask(GL_FALSE);
 	for (auto& emitter : Emitters)
 		emitter.DrawParticles();
-
+	glDepthMask(GL_TRUE);
 	//glMatrixMode(GL_MODELVIEW);
 	//glLoadIdentity();
 

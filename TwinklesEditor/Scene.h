@@ -23,12 +23,16 @@ struct RenderParticle
 
 	glm::vec4 Color;
 
+	float Size;
+
 	float Life;
+
+	float Rand; //per particle random
 
 	//glm::mat4 Transform;
 
 	//Position(0.0f),
-	RenderParticle() : Velocity(0.0f), Color(1.0f), Life(0.0f) {}
+	RenderParticle() : Velocity(0.0f), Color(1.0f), Size(1.0f), Life(0.0f), Rand(0.0f) {}
 };
 
 class Scene;
@@ -39,6 +43,8 @@ private:
 	Emitter& SourceEmitter;
 	const uint32_t particleCount = 10000;
 	std::vector<RenderParticle> particles;
+
+	float particleAccumulator = 0.0f;
 	uint32_t FirstUnusedParticle();
 	void ParticleRespawn(RenderParticle& particle);
 	Shader* particleShader = nullptr;
@@ -46,8 +52,12 @@ private:
 	uint32_t EmitterVBO;
 	uint32_t EmitterVAO;
 
+	bool TextureLoaded = false;
+	uint32_t SpriteTex;
+
 	Scene* parentScene;
 public:
+	void SetTexture(const char* path);
 	void EmitterTick(float deltaTime);
 	void DrawParticles();
 	RenderEmitter(Emitter& emit, Scene* InScene);
@@ -59,9 +69,8 @@ public:
 	unsigned int texColorBuffer = 0;
 	bool CaptureMouse = false;
 
-private:
 	std::string Directory;
-	
+private:
 	//glm::mat4 cameraView;
 	glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);
 	//glm::vec3 cameraRot = glm::vec3(-75.0f, 0.0f, 15.0f);
@@ -71,8 +80,6 @@ private:
 	unsigned int rbo;
 
 	double zoom = 4.0;
-
-	
 
 	TwinklesSystem ActiveSystem;
 	std::vector<RenderEmitter> Emitters;
