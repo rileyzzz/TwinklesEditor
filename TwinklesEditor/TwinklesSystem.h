@@ -96,6 +96,12 @@ struct Quaternion
 	float y = 0.0f;
 	float z = 0.0f;
 	float w = 1.0f;
+
+	glm::quat ToGLM()
+	{
+		//quaternion constructor is wxyz
+		return glm::quat(w, x, y, z);
+	}
 };
 
 struct Color

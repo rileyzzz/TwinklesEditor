@@ -65,7 +65,7 @@ void Scene::InitGL()
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
 	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
-	glEnable(GL_CULL_FACE);
+	//glEnable(GL_CULL_FACE);
 
 	//glEnable(GL_LIGHTING);
 	glEnable(GL_NORMALIZE);
@@ -344,6 +344,13 @@ void RenderEmitter::ParticleRespawn(RenderParticle& particle)
 	particle.Rand = (float)std::rand() / (float)RAND_MAX;
 
 	particle.Position = SourceEmitter.Position.ToGLM();
+
+	glm::vec3 EmitterSize = SourceEmitter.EmitterSize.GetKey(0.0f).ToGLM();
+	particle.Position.x += EmitterSize.x * randfloat();
+	particle.Position.y += EmitterSize.y * randfloat();
+	particle.Position.z += EmitterSize.z * randfloat();
+
+
 	//particle.Transform = glm::mat4();
 	//particle.Transform = glm::translate(particle.Transform, SourceEmitter.Position.ToGLM());
 	particle.Color = SourceEmitter.Color.GetKey(0.0f).ToGLM();
@@ -355,6 +362,13 @@ void RenderEmitter::ParticleRespawn(RenderParticle& particle)
 	VelocityCone.z += SourceEmitter.ZSpeedVariance.GetKey(0.0f) * randfloat();
 	particle.Velocity = VelocityCone;
 
+	//glm::quat testRot(glm::vec3(-45.0f, 0.0f, 0.0f));
+	//std::cout << "rotation " << SourceEmitter.Rotation.x << " " << SourceEmitter.Rotation.y << " " << SourceEmitter.Rotation.z << " " << SourceEmitter.Rotation.w << "\n";
+	//std::cout << "rotation " << testRot.x << " " << testRot.y << " " << testRot.z << " " << testRot.w << "\n";
+
+	glm::mat4 rotationMat(SourceEmitter.Rotation.ToGLM());
+	particle.Velocity = glm::vec3(rotationMat * glm::vec4(particle.Velocity, 1.0f));
+
 	particle.RotationRate = SourceEmitter.MaxRotation.GetKey(0.0f) * randfloat();
 
 	//size_control*(max_size-min_size) + size_control*size_variance
@@ -363,6 +377,9 @@ void RenderEmitter::ParticleRespawn(RenderParticle& particle)
 	float min_size = MinMax.x;
 	float max_size = MinMax.y;
 	float size_variance = SourceEmitter.SizeVariance.GetKey(0.0f) * particle.Rand;
+
+	if (max_size < min_size)
+		max_size = min_size;
 	particle.Size = size_control * (max_size - min_size) + size_control * size_variance;
 	particle.Size = std::clamp(particle.Size, min_size, max_size);
 }
@@ -432,7 +449,9 @@ void RenderEmitter::EmitterTick(float deltaTime)
 			float max_size = MinMax.y;
 			//0 on purpose
 			float size_variance = SourceEmitter.SizeVariance.GetKey(0.0f) * particle.Rand; // * randfloat()
-
+			
+			if (max_size < min_size)
+				max_size = min_size;
 			particle.Size = size_control * (max_size - min_size) + size_control * size_variance;
 			particle.Size = std::clamp(particle.Size, min_size, max_size);
 		}
@@ -475,6 +494,7 @@ void RenderEmitter::DrawParticles()
 
 	particleShader->setMat4("view", parentScene->view);
 	particleShader->setMat4("projection", parentScene->projection);
+	particleShader->setInt("type", (uint32_t)SourceEmitter.Type);
 
 	glBindTexture(GL_TEXTURE_2D, SpriteTex);
 	glBindVertexArray(EmitterVAO);
