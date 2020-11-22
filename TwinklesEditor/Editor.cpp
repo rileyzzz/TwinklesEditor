@@ -40,7 +40,7 @@ Editor::Editor(int argc, char** argv)
 	ImGui_ImplSDL2_InitForOpenGL(window, glcontext);
 	ImGui_ImplOpenGL3_Init();
 
-	ParticleScene = new Scene;
+	ParticleScene = new Scene(ApplicationDir.string());
 
 	ParticleScene->InitGL();
 	ParticleScene->ResizeScene(1024, 1024);

@@ -163,6 +163,7 @@
     <ClCompile Include="Editor.cpp" />
     <ClCompile Include="IOArchive.cpp" />
     <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="Shader.cpp" />
     <ClCompile Include="TwinklesEditor.cpp" />
     <ClCompile Include="TwinklesSystem.cpp" />
   </ItemGroup>
@@ -170,6 +171,7 @@
     <ClInclude Include="Editor.h" />
     <ClInclude Include="IOArchive.h" />
     <ClInclude Include="Scene.h" />
+    <ClInclude Include="Shader.h" />
     <ClInclude Include="TwinklesSystem.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

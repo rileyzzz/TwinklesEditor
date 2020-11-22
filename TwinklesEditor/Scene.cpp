@@ -9,6 +9,26 @@ bool keyboard_e = false;
 
 //TwinklesSystem* ActiveSystem = nullptr;
 
+Scene::Scene(std::string InDirectory) : Directory(InDirectory)
+{
+	view = glm::translate(view, glm::vec3(0.0f, 0.0f, -40.0f));
+	view = glm::rotate(view, glm::radians(-75.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+	view = glm::rotate(view, glm::radians(15.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+	projection = glm::perspective(glm::radians(45.0f), 1024.0f / 1024.0f, 0.1f, 1000.0f);
+
+	particleShader = new Shader((Directory + "/shaders/pfx.vert").c_str(), (Directory + "/shaders/pfx.frag").c_str(), (Directory + "/shaders/pfx.geom").c_str());
+	//particleShader = new Shader((Directory + "/shaders/pfx.vert").c_str(), (Directory + "/shaders/pfx.frag").c_str());
+}
+
+Scene::~Scene()
+{
+	glDeleteFramebuffers(1, &fbo);
+	delete particleShader;
+
+	//delete ActiveSystem;
+}
+
 void Scene::InitGL()
 {
 	glGenFramebuffers(1, &fbo);
@@ -62,12 +82,6 @@ void Scene::InitGL()
 	cameraPos = glm::vec3(10.0f, 10.0f, 10.0f);
 }
 
-Scene::~Scene()
-{
-	glDeleteFramebuffers(1, &fbo);
-	//delete ActiveSystem;
-}
-
 void Scene::Keyboard(SDL_KeyboardEvent keyevent, bool state)
 {
 	switch (keyevent.keysym.sym)
@@ -88,7 +102,11 @@ void Scene::Keyboard(SDL_KeyboardEvent keyevent, bool state)
 void Scene::MouseWheel(SDL_MouseWheelEvent wheelevent)
 {
 	double target = zoom * (1.0 + (wheelevent.y * 0.25));
-	if (target > 0.2) zoom = target;
+	if (target > 0.2)
+	{
+		zoom = target;
+		view = glm::scale(view, glm::vec3(1.0 + (wheelevent.y * 0.25)));
+	}
 }
 
 void Scene::MouseMove(SDL_MouseMotionEvent motionevent)
@@ -104,7 +122,16 @@ void Scene::MouseMove(SDL_MouseMotionEvent motionevent)
 		//glm::mat4 yMatrix(yQuat);
 		//cameraView = cameraView * xMatrix;
 		//cameraView = cameraView * yMatrix;
-		cameraRot += glm::vec3(motionevent.yrel / 4.0f, 0.0f, motionevent.xrel / 4.0f);
+		//cameraRot += glm::vec3(motionevent.yrel / 4.0f, 0.0f, motionevent.xrel / 4.0f);
+		
+		const glm::mat4 inverted = glm::inverse(view);
+		const glm::vec3 right = normalize(glm::vec3(inverted[0]));
+
+		//view = glm::rotate(view, motionevent.yrel / 40.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+		view = glm::rotate(view, motionevent.yrel / 100.0f, right);
+		view = glm::rotate(view, motionevent.xrel / 100.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+
+		//cameraRot += glm::vec3(motionevent.yrel / 4.0f, 0.0f, motionevent.xrel / 4.0f);
 	}
 }
 
@@ -177,6 +204,8 @@ void Scene::ResizeScene(int inWidth, int inHeight)
 	width = inWidth;
 	height = inHeight;
 
+	projection = glm::perspective(glm::radians(45.0f), (GLfloat)width / (GLfloat)height, 0.1f, 1000.0f);
+
 	glBindTexture(GL_TEXTURE_2D, texColorBuffer);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -186,6 +215,74 @@ void Scene::ResizeScene(int inWidth, int inHeight)
 	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
 	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
 	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+}
+
+RenderEmitter::RenderEmitter(Emitter& emit, Scene* InScene) : SourceEmitter(emit), parentScene(InScene)
+{
+	particleShader = parentScene->particleShader;
+
+	for (unsigned int i = 0; i < particleCount; ++i)
+		particles.push_back(RenderParticle());
+
+	glGenBuffers(1, &EmitterVBO);
+	glGenVertexArrays(1, &EmitterVAO);
+
+	glBindVertexArray(EmitterVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, EmitterVBO);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(RenderParticle) * particleCount, &particles[0], GL_DYNAMIC_DRAW);
+
+
+	//attributes bound to current VBO
+
+	//position
+	glEnableVertexAttribArray(0); //corresponds to layout location
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)0);
+	//glVertexAttribDivisor(0, 1);
+
+	//velocity
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Velocity));
+	//glVertexAttribDivisor(1, 1);
+
+	//color
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Color));
+	//glVertexAttribDivisor(2, 1);
+
+	//life
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Life));
+	//glVertexAttribDivisor(3, 1);
+
+	////transform
+	//constexpr std::size_t vec4size = sizeof(glm::vec4);
+	//glEnableVertexAttribArray(3);
+	//glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Transform));
+	//glEnableVertexAttribArray(4);
+	//glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)(offsetof(RenderParticle, Transform) + 1 * vec4size));
+	//glEnableVertexAttribArray(5);
+	//glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)(offsetof(RenderParticle, Transform) + 2 * vec4size));
+	//glEnableVertexAttribArray(6);
+	//glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)(offsetof(RenderParticle, Transform) + 3 * vec4size));
+	//
+	////instancing
+	//glVertexAttribDivisor(3, 1);
+	//glVertexAttribDivisor(4, 1);
+	//glVertexAttribDivisor(5, 1);
+	//glVertexAttribDivisor(6, 1);
+
+
+
+	//glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+	//std::cout << "Color along:\n";
+	//for (float i = 0.0f; i < 1.0f; i += 0.1f)
+	//{
+	//	Color color = SourceEmitter.Color.GetKey(i);
+	//	std::cout << color << "\n";
+	//	//std::cout << "color " << particles[0].Color.r << " " << particles[0].Color.g << " " << particles[0].Color.b << " " << particles[0].Color.a << "\n";
+	//}
 }
 
 uint32_t RenderEmitter::FirstUnusedParticle()
@@ -221,6 +318,8 @@ void RenderEmitter::ParticleRespawn(RenderParticle& particle)
 	//float random = (float)std::rand() / (float)RAND_MAX;
 
 	particle.Position = SourceEmitter.Position.ToGLM();
+	//particle.Transform = glm::mat4();
+	//particle.Transform = glm::translate(particle.Transform, SourceEmitter.Position.ToGLM());
 	particle.Color = SourceEmitter.Color.GetKey(0.0f).ToGLM();
 	particle.Life = 1.0f;
 	//z is fixed, x and y vary
@@ -251,6 +350,8 @@ void RenderEmitter::EmitterTick(float deltaTime)
 		if (particle.Life > 0.0f)
 		{
 			particle.Velocity.z -= SourceEmitter.Gravity.GetKey(1.0f - particle.Life) / 40.0f;
+			//particle.Transform = glm::translate(particle.Transform, particle.Velocity * deltaTime);
+			//particle.
 			particle.Position += particle.Velocity * deltaTime;
 			particle.Color = SourceEmitter.Color.GetKey(1.0f - particle.Life).ToGLM();
 		}
@@ -263,14 +364,46 @@ void RenderEmitter::DrawParticles()
 	//glBegin(GL_POINTS);
 	
 	//std::cout << "color " << particles[0].Color.r << " " << particles[0].Color.g << " " << particles[0].Color.b << " " << particles[0].Color.a << "\n";
-	for (const auto& particle : particles)
-	{
-		glColor4fv(glm::value_ptr(particle.Color));
-		glBegin(GL_POINTS);
-		glVertex3fv(glm::value_ptr(particle.Position));
-		glEnd();
-	}
+
+
+	glBindBuffer(GL_ARRAY_BUFFER, EmitterVBO);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(RenderParticle) * particleCount, &particles[0]);
+
+	//glm::mat4 modelview;
+	//glm::mat4 proj;
+	//glGetFloatv(GL_MODELVIEW_MATRIX, glm::value_ptr(modelview));
+	//glGetFloatv(GL_PROJECTION_MATRIX, glm::value_ptr(proj));
+
+
+	//Additive blending
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+	particleShader->use();
+
+	particleShader->setMat4("view", parentScene->view);
+	particleShader->setMat4("projection", parentScene->projection);
+
+	glBindVertexArray(EmitterVAO);
+	//glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, particleCount);
+	//glDrawArraysInstanced(GL_POINTS, 0, 1, particleCount);
+	glDrawArrays(GL_POINTS, 0, particleCount);
+	glBindVertexArray(0);
+
+	//glBegin(GL_POINTS);
+	//for (const auto& particle : particles)
+	//{
+	//	if (particle.Life > 0.0f)
+	//	{
+	//		glPushMatrix();
+	//		//glTranslatef(particle.Position.x, );
+	//		//glMultMatrixf(glm::value_ptr(particle.Transform));
+	//		glVertex3fv(glm::value_ptr(particle.Position));
+	//		//particleShader->setVec4("color", particle.Color);
+
+	//		glPopMatrix();
+	//	}
+	//}
 	//glEnd();
+	glUseProgram(0);
 }
 
 void Scene::Render(float deltaTime)
@@ -296,26 +429,30 @@ void Scene::Render(float deltaTime)
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluPerspective(45.0f, (GLfloat)width / (GLfloat)height, 0.1f, 1000.0f);
+	//gluPerspective(45.0f, (GLfloat)width / (GLfloat)height, 0.1f, 1000.0f);
+	glMultMatrixf(glm::value_ptr(projection));
+	glMatrixMode(GL_MODELVIEW);						// Select The Modelview Matrix
+	glLoadIdentity();							// Reset The Modelview Matrix
+	glMultMatrixf(glm::value_ptr(view));
 
-	glTranslatef(0.0f, 0.0f, -40.0f);
+	//glTranslatef(0.0f, 0.0f, -40.0f);
 	//glMultMatrixf(glm::value_ptr(cameraView));
 	//glm::mat4 cameraMatrix = glm::mat4(glm::quat(cameraRot));
 	//glMultMatrixf(glm::value_ptr(cameraMatrix));
 
-	glRotatef(cameraRot.x, 1.0f, 0.0f, 0.0f);
-	glRotatef(cameraRot.y, 0.0f, 1.0f, 0.0f);
-	glRotatef(cameraRot.z, 0.0f, 0.0f, 1.0f);
+	//glRotatef(cameraRot.x, 1.0f, 0.0f, 0.0f);
+	//glRotatef(cameraRot.y, 0.0f, 1.0f, 0.0f);
+	//glRotatef(cameraRot.z, 0.0f, 0.0f, 1.0f);
 
-	glScalef(zoom, zoom, zoom);
+	//glScalef(zoom, zoom, zoom);
 
 	DrawGrid();
 
 	for (auto& emitter : Emitters)
 		emitter.DrawParticles();
 
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
+	//glMatrixMode(GL_MODELVIEW);
+	//glLoadIdentity();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -327,7 +464,7 @@ void Scene::OpenFile(const char* path)
 	ActiveSystem = TwinklesSystem(path);
 
 	for(auto& emitter : ActiveSystem.Emitters)
-		Emitters.emplace_back(emitter);
+		Emitters.emplace_back(emitter, this);
 }
 
 void Scene::ExportFile(const char* path)
