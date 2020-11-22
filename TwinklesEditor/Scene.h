@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <algorithm>
 #include <GL/glew.h>
 #include <GL/gl.h>
 #include <GL/glu.h>

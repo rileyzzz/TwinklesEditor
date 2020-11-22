@@ -363,7 +363,8 @@ void RenderEmitter::ParticleRespawn(RenderParticle& particle)
 	float min_size = MinMax.x;
 	float max_size = MinMax.y;
 	float size_variance = SourceEmitter.SizeVariance.GetKey(0.0f) * particle.Rand;
-	particle.Size = size_control * (max_size - min_size) + min_size + size_control * size_variance;
+	particle.Size = size_control * (max_size - min_size) + size_control * size_variance;
+	particle.Size = std::clamp(particle.Size, min_size, max_size);
 }
 
 void RenderEmitter::SetTexture(const char* path)
@@ -432,7 +433,8 @@ void RenderEmitter::EmitterTick(float deltaTime)
 			//0 on purpose
 			float size_variance = SourceEmitter.SizeVariance.GetKey(0.0f) * particle.Rand; // * randfloat()
 
-			particle.Size = size_control * (max_size - min_size) + min_size + size_control * size_variance;
+			particle.Size = size_control * (max_size - min_size) + size_control * size_variance;
+			particle.Size = std::clamp(particle.Size, min_size, max_size);
 		}
 	}
 }

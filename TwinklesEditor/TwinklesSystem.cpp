@@ -74,6 +74,7 @@ bool Emitter::Serialize(IOArchive& Ar, uint32_t Version)
 	//unknown float value
 	float unknown = 1.0f;
 	Ar << unknown;
+	std::cout << "Unknown float: " << unknown << "\n";
 
 	std::cout << "Lifetime:\n";
 	Lifetime.Serialize(Ar);
