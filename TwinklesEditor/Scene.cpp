@@ -74,8 +74,8 @@ void Scene::InitGL()
 	glEnable(GL_MULTISAMPLE);
 
 	glEnable(GL_BLEND);
-	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	//glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
 	//glm::vec3 camPos(10.0f, 10.0f, 10.0f);
 	//glm::vec3 camTarget(0.0f, 0.0f, 0.0f);
@@ -267,14 +267,18 @@ RenderEmitter::RenderEmitter(Emitter& emit, Scene* InScene) : SourceEmitter(emit
 	glEnableVertexAttribArray(3);
 	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Size));
 
-	//life
+	//rotation
 	glEnableVertexAttribArray(4);
-	glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Life));
+	glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Rotation));
+
+	//life
+	glEnableVertexAttribArray(5);
+	glVertexAttribPointer(5, 1, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Life));
 	//glVertexAttribDivisor(3, 1);
 
 	//random
-	glEnableVertexAttribArray(5);
-	glVertexAttribPointer(5, 1, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Rand));
+	//glEnableVertexAttribArray(5);
+	//glVertexAttribPointer(5, 1, GL_FLOAT, GL_FALSE, sizeof(RenderParticle), (void*)offsetof(RenderParticle, Rand));
 
 	////transform
 	//constexpr std::size_t vec4size = sizeof(glm::vec4);
@@ -348,7 +352,10 @@ void RenderEmitter::ParticleRespawn(RenderParticle& particle)
 	glm::vec3 VelocityCone = SourceEmitter.VelocityCone.GetKey(0.0f).ToGLM();
 	VelocityCone.x *= randfloat();
 	VelocityCone.y *= randfloat();
+	VelocityCone.z += SourceEmitter.ZSpeedVariance.GetKey(0.0f) * randfloat();
 	particle.Velocity = VelocityCone;
+
+	particle.RotationRate = SourceEmitter.MaxRotation.GetKey(0.0f) * randfloat();
 
 	//size_control*(max_size-min_size) + size_control*size_variance
 	float size_control = SourceEmitter.Size.GetKey(0.0f);
@@ -356,7 +363,7 @@ void RenderEmitter::ParticleRespawn(RenderParticle& particle)
 	float min_size = MinMax.x;
 	float max_size = MinMax.y;
 	float size_variance = SourceEmitter.SizeVariance.GetKey(0.0f) * particle.Rand;
-	particle.Size = size_control * (max_size - min_size) + size_control * size_variance;
+	particle.Size = size_control * (max_size - min_size) + min_size + size_control * size_variance;
 }
 
 void RenderEmitter::SetTexture(const char* path)
@@ -415,6 +422,7 @@ void RenderEmitter::EmitterTick(float deltaTime)
 			//particle.
 			particle.Position += particle.Velocity * deltaTime;
 			particle.Color = SourceEmitter.Color.GetKey(1.0f - particle.Life).ToGLM();
+			particle.Rotation += particle.RotationRate;
 
 			float size_control = SourceEmitter.Size.GetKey(1.0f - particle.Life);
 			//0 on purpose
@@ -424,7 +432,7 @@ void RenderEmitter::EmitterTick(float deltaTime)
 			//0 on purpose
 			float size_variance = SourceEmitter.SizeVariance.GetKey(0.0f) * particle.Rand; // * randfloat()
 
-			particle.Size = size_control * (max_size - min_size) + size_control * size_variance;
+			particle.Size = size_control * (max_size - min_size) + min_size + size_control * size_variance;
 		}
 	}
 }
@@ -460,7 +468,7 @@ void RenderEmitter::DrawParticles()
 
 
 	//Additive blending
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+	//glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 	particleShader->use();
 
 	particleShader->setMat4("view", parentScene->view);

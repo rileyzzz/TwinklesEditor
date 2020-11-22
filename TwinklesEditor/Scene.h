@@ -27,12 +27,17 @@ struct RenderParticle
 
 	float Life;
 
+	float Rotation;
+
+	//Not sent to particle shader
 	float Rand; //per particle random
+
+	float RotationRate;
 
 	//glm::mat4 Transform;
 
 	//Position(0.0f),
-	RenderParticle() : Velocity(0.0f), Color(1.0f), Size(1.0f), Life(0.0f), Rand(0.0f) {}
+	RenderParticle() : Velocity(0.0f), Color(1.0f), Size(1.0f), Life(0.0f), Rotation(0.0f), Rand(0.0f), RotationRate(0.0f) {}
 };
 
 class Scene;

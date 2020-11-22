@@ -66,8 +66,8 @@ struct Vector3
 	friend IOArchive& operator<<(IOArchive& Ar, Vector3& vec)
 	{
 		Ar << vec.x;
-		Ar << vec.y;
 		Ar << vec.z;
+		Ar << vec.y;
 		return Ar;
 	}
 	inline std::string DebugString() const
