@@ -12,7 +12,7 @@ Editor::Editor(int argc, char** argv)
 	}
 
 
-	int scrw = 1024;
+	int scrw = 1400;
 	int scrh = 1024;
 	window = SDL_CreateWindow("Twinkles Editor",
 		SDL_WINDOWPOS_CENTERED,
@@ -43,7 +43,7 @@ Editor::Editor(int argc, char** argv)
 	ParticleScene = new Scene(ApplicationDir.string());
 
 	ParticleScene->InitGL();
-	ParticleScene->ResizeScene(1024, 1024);
+	ParticleScene->ResizeScene(scrw, scrh);
 	//MyContext = new LibGLContext(wglGetCurrentDC(), wglGetCurrentContext());
 	int close = 0;
 	while (!close)
@@ -124,6 +124,13 @@ Editor::Editor(int argc, char** argv)
 
 		ImGui::End();
 
+		ImGui::SetNextWindowPos(ImVec2(0, 25), ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(200, scrh), ImGuiCond_FirstUseEver);
+		ImGui::Begin("Outliner", nullptr,
+			ImGuiWindowFlags_NoSavedSettings);
+		DrawOutliner();
+		ImGui::End();
+
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		// Render imgui
 		ImGui::Render();
@@ -159,6 +166,7 @@ void Editor::Draw()
 			}
 			if (ImGui::MenuItem("Open"))
 			{
+				ObjectID = 0;
 				char szFile[255];
 				OPENFILENAMEA ofn;
 				ZeroMemory(&ofn, sizeof(ofn));
@@ -177,6 +185,12 @@ void Editor::Draw()
 				{
 					//LoadMesh(szFile);
 					ParticleScene->OpenFile(szFile);
+					auto& emitters = ParticleScene->ActiveSystem.Emitters;
+					selectedEmitter = -1;
+					selectedTrack = "";
+					EditEmitters.clear();
+					for (auto& emit : emitters)
+						EditEmitters.emplace_back(&emit);
 				}
 			}
 			ImGui::EndMenu();
@@ -203,5 +217,36 @@ void Editor::Draw()
 		io.WantCaptureMouse = true;
 		SDL_SetRelativeMouseMode(SDL_TRUE);
 	}
+}
 
+void Editor::DrawOutliner()
+{
+	ImGuiTreeNodeFlags TreeFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
+
+	//auto& emitters = ParticleScene->ActiveSystem.Emitters;
+
+	for (const auto& emit : EditEmitters)
+	{
+		Emitter* SourceEmitter = emit.SourceEmitter;
+		std::string name = "Emitter " + std::to_string(emit.ID);
+		if (ImGui::TreeNode(name.c_str()))
+		{
+			for (const auto& track : emit.Tracks)
+			{
+				ImGuiTreeNodeFlags flags = TreeFlags;
+				if (track.first == selectedTrack)
+					flags |= ImGuiTreeNodeFlags_Selected;
+
+				std::string itemname = track.first + "##" + std::to_string(emit.ID);
+				ImGui::TreeNodeEx(itemname.c_str(), flags);
+
+				if (ImGui::IsItemClicked())
+				{
+					selectedEmitter = emit.ID;
+					selectedTrack = track.first;
+				}
+			}
+			ImGui::TreePop();
+		}
+	}
 }

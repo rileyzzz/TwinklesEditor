@@ -1,4 +1,5 @@
 #pragma once
+#include <typeinfo>
 #include <map>
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
@@ -153,10 +154,22 @@ struct Color
 //	}
 //};
 
+class KeyframeTrackBase
+{
+	const type_info& type;
+public:
+	KeyframeTrackBase(const type_info& InType) : type(InType) { }
+	const type_info& GetType()
+	{
+		return type;
+	}
+};
+
 template <class T>
-class KeyframeTrack
+class KeyframeTrack : public KeyframeTrackBase
 {
 public:
+	KeyframeTrack() : KeyframeTrackBase(typeid(T)) { }
 	//std::vector<Keyframe<T>> Frames;
 	std::map<float, T> Frames;
 	bool Serialize(IOArchive& Ar)

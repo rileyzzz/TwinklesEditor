@@ -17,7 +17,7 @@ Scene::Scene(std::string InDirectory) : Directory(InDirectory)
 	view = glm::rotate(view, glm::radians(-75.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 	view = glm::rotate(view, glm::radians(15.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
-	projection = glm::perspective(glm::radians(45.0f), 1024.0f / 1024.0f, 0.1f, 1000.0f);
+	projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 1000.0f);
 
 	particleShader = new Shader((Directory + "/shaders/pfx.vert").c_str(), (Directory + "/shaders/pfx.frag").c_str(), (Directory + "/shaders/pfx.geom").c_str());
 	//particleShader = new Shader((Directory + "/shaders/pfx.vert").c_str(), (Directory + "/shaders/pfx.frag").c_str());
@@ -38,7 +38,7 @@ void Scene::InitGL()
 
 	glGenTextures(1, &texColorBuffer);
 	glBindTexture(GL_TEXTURE_2D, texColorBuffer);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1024, 1024, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -48,7 +48,7 @@ void Scene::InitGL()
 	
 	glGenRenderbuffers(1, &rbo);
 	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 1024, 1024);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
 	glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);

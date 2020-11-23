@@ -81,15 +81,16 @@ private:
 	glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);
 	//glm::vec3 cameraRot = glm::vec3(-75.0f, 0.0f, 15.0f);
 
-	int width, height;
+	int width = 1400;
+	int height = 1024;
 	unsigned int fbo;
 	unsigned int rbo;
 
 	double zoom = 4.0;
 
+public:
 	TwinklesSystem ActiveSystem;
 	std::vector<RenderEmitter> Emitters;
-public:
 
 	Shader* particleShader = nullptr;
 	glm::mat4 view = glm::mat4(1.0f);
