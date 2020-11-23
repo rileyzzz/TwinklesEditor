@@ -125,10 +125,31 @@ Editor::Editor(int argc, char** argv)
 		ImGui::End();
 
 		ImGui::SetNextWindowPos(ImVec2(0, 25), ImGuiCond_FirstUseEver);
-		ImGui::SetNextWindowSize(ImVec2(200, scrh), ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(200, scrh - 200 - 20), ImGuiCond_FirstUseEver);
 		ImGui::Begin("Outliner", nullptr,
 			ImGuiWindowFlags_NoSavedSettings);
 		DrawOutliner();
+		ImGui::End();
+		
+		int w, h;
+		SDL_GetWindowSize(window, &w, &h);
+		static int GraphHeight = 200;
+
+		//ImVec2 windowSize = ImVec2(scrw, scrh);
+		ImGui::SetNextWindowPos(ImVec2(0, h - GraphHeight), ImGuiCond_Always);
+		ImGui::SetNextWindowSize(ImVec2(w, GraphHeight), ImGuiCond_Always);
+		ImGui::Begin("Graph", nullptr,
+			ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | //ImGuiWindowFlags_NoResize | 
+			ImGuiWindowFlags_NoSavedSettings);
+
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+		ImGui::InvisibleButton("hsplitter", ImVec2(-1, 8.0f));
+		if (ImGui::IsItemActive())
+			GraphHeight -= ImGui::GetIO().MouseDelta.y;
+		ImGui::Separator();
+		ImGui::PopStyleVar();
+
+		DrawGraph();
 		ImGui::End();
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -203,12 +224,31 @@ void Editor::Draw()
 
 		ImGui::EndMainMenuBar();
 	}
-	
 
-	ImGui::BeginChild("Scene");
-	ImVec2 wsize = ImGui::GetWindowSize();
+	ImGui::Dummy(ImVec2(0, 16));
+
+	//float w = ImGui::GetWindowContentRegionMax().x;
+	//static float h = ImGui::GetWindowContentRegionMax().y - 200;
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+	ImGui::BeginChild("Scene"); //, ImVec2(w, h), true, ImGuiWindowFlags_NoScrollbar
+	//ImVec2 wsize = ImGui::GetWindowSize();
+	ImVec2 wsize = ImGui::GetWindowContentRegionMax();
+	//ImVec2 wsize = ImVec2(w, h);
 	ImGui::Image((ImTextureID)ParticleScene->texColorBuffer, wsize, ImVec2(0, 1), ImVec2(1, 0));
 	ImGui::EndChild();
+	ImGui::PopStyleVar();
+
+	//ImGui::InvisibleButton("hsplitter", ImVec2(-1, 2.0f));
+	//if (ImGui::IsItemActive())
+	//{
+	//	h += ImGui::GetIO().MouseDelta.y;
+
+	//}
+
+	//ImGui::BeginChild("Graph", ImVec2(0, 0), true);
+
+	//ImGui::EndChild();
 
 	ImGuiIO& io = ImGui::GetIO();
 	if (ImGui::IsItemClicked())
@@ -248,5 +288,23 @@ void Editor::DrawOutliner()
 			}
 			ImGui::TreePop();
 		}
+	}
+}
+
+void Editor::DrawGraph()
+{
+	if (selectedTrack != "")
+	{
+		ImGui::Text(selectedTrack.c_str());
+		EditEmitter& emit = EditEmitters[selectedEmitter];
+		KeyframeTrackBase* emitTrack = emit.Tracks[selectedTrack];
+		
+		if (emitTrack->type == typeid(float))
+		{
+			auto* Track = dynamic_cast<KeyframeTrack<float>*>(emitTrack);
+
+		}
+		//static float arr[] = { 0.6f, 0.1f, 1.0f, 0.5f, 0.92f, 0.1f, 0.2f };
+		//ImGui::PlotLines("Frame Times", arr, IM_ARRAYSIZE(arr));
 	}
 }

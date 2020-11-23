@@ -52,9 +52,10 @@ public:
 	std::vector<EditEmitter> EditEmitters;
 
 	int32_t selectedEmitter = -1;
-	std::string selectedTrack;
+	std::string selectedTrack = "";
 
 	//Widgets
 	void DrawOutliner();
+	void DrawGraph();
 };
 

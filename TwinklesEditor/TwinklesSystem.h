@@ -156,13 +156,10 @@ struct Color
 
 class KeyframeTrackBase
 {
-	const type_info& type;
 public:
+	const type_info& type;
 	KeyframeTrackBase(const type_info& InType) : type(InType) { }
-	const type_info& GetType()
-	{
-		return type;
-	}
+	virtual ~KeyframeTrackBase() = 0;
 };
 
 template <class T>
@@ -170,6 +167,7 @@ class KeyframeTrack : public KeyframeTrackBase
 {
 public:
 	KeyframeTrack() : KeyframeTrackBase(typeid(T)) { }
+	virtual ~KeyframeTrack() { }
 	//std::vector<Keyframe<T>> Frames;
 	std::map<float, T> Frames;
 	bool Serialize(IOArchive& Ar)

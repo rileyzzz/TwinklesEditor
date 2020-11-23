@@ -154,6 +154,10 @@ Color lerp(const Color& a, const Color& b, float f)
 //	return Vector3();
 //}
 
+KeyframeTrackBase::~KeyframeTrackBase()
+{
+
+}
 
 template<class T>
 T KeyframeTrack<T>::GetKey(float time)
