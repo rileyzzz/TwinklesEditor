@@ -295,9 +295,22 @@ void Editor::DrawOutliner()
 void DrawEditCursor(ImVec2 pos)
 {
 	ImDrawList* draw_list = ImGui::GetWindowDrawList();
-	draw_list->AddCircle(pos, 0.5f, 0xFF545454, 12);
+	constexpr float size = 8.0f;
+	draw_list->AddCircle(pos, size, 0xFF808080, 12);
+	draw_list->AddCircle(pos, size + 1, 0xFFA8A8A8, 12);
 }
 
+void DrawGraphLine(ImVec2 A, ImVec2 B)
+{
+	ImDrawList* draw_list = ImGui::GetWindowDrawList();
+	draw_list->AddLine(A, B, 0xFF1B1B9E, 1.5f);
+}
+
+//template <class T>
+//void DrawTrack(KeyframeTrack<T>* Track)
+//{
+//
+//}
 
 void Editor::DrawGraph()
 {
@@ -306,34 +319,133 @@ void Editor::DrawGraph()
 		ImGui::Text(selectedTrack->name.c_str());
 		EditEmitter& emit = EditEmitters[selectedEmitter];
 		
-		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2f, 0.2f, 0.2f, 0.5f));
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2f, 0.2f, 0.2f, 0.25f));
 		ImGui::BeginChild("Graph", ImVec2(0, 0), true);
-		ImVec2 size = ImGui::GetWindowSize();
+		ImVec2 size = ImGui::GetWindowContentRegionMax();
 		ImVec2 windowPos = ImGui::GetWindowPos();
-		std::cout << "size x " << size.x << "\n";
+		ImVec2 contentMin = ImGui::GetWindowContentRegionMin();
+		windowPos.x += contentMin.x / 2;
+		windowPos.y += contentMin.y / 2;
+		//ImVec2 windowPos = ImGui::GetWindowContentRegionMin();
+
+		//std::map<KeyframeTrack<float>*, float>
+		//std::cout << "pos " << windowPos.x << " " << windowPos.y << "\n";
+		//std::cout << "size " << size.x << " " << size.y << "\n";
 		ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
 		ImU32 lineColor(0xFF545454);
-		for (uint32_t i = 0; i < size.x; i += size.x / 20)
+		for (float i = 0.0f; i < size.x; i += size.x / 20.0f)
 			draw_list->AddLine(ImVec2(windowPos.x + i, windowPos.y), ImVec2(windowPos.x + i, windowPos.y + size.y), lineColor);
 
-		for (uint32_t i = 0; i < size.y; i += size.y / 4)
+		for (float i = 0.0f; i < size.y; i += size.y / 4.0f)
 			draw_list->AddLine(ImVec2(windowPos.x, windowPos.y + i), ImVec2(windowPos.x + size.x, windowPos.y + i), lineColor);
 
-		
+
 		if (selectedTrack->type == typeid(float))
 		{
 			auto* Track = dynamic_cast<KeyframeTrack<float>*>(selectedTrack);
+
+			float maxHeight = 1.0f;
+			for (auto& frame : Track->Frames)
+				maxHeight = std::max(maxHeight, frame.second);
+
+
 			for (auto& frame : Track->Frames)
 			{
 				float x = frame.first * size.x;
-				float y = (1.0f - frame.second) * size.y;
+				float y = (1.0f - frame.second / maxHeight) * size.y;
 				ImVec2 pos((float)windowPos.x + x, (float)windowPos.y + y);
+
+				auto next = Track->GetNextFrame(frame.first);
+				if (next.first != frame.first)
+				{
+					float nextx = next.first * size.x;
+					float nexty = (1.0f - next.second / maxHeight) * size.y;
+					ImVec2 nextPos((float)windowPos.x + nextx, (float)windowPos.y + nexty);
+					DrawGraphLine(pos, nextPos);
+				}
+				
 				DrawEditCursor(pos);
+
+				//if (ImGui::IsItemActive())
+				//{
+
+				//}
 			}
 		}
+		//ImGui::EndChild();
+		//ImGui::PopStyleColor();
+
+		//static bool pendingChanges = false;
+		//if (ImGui::IsItemClicked())
+		//{
+		//	pendingChanges = true;
+
+		//}
+		static bool hasTarget = false;
+		//static std::pair<float, float> targetEdit = std::make_pair<float, float>(-1.0f, -1.0f);
+
+		if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+			hasTarget = false;
+
+		if (ImGui::IsItemActive())
+		{
+			if (selectedTrack->type == typeid(float))
+			{
+				
+				auto* Track = dynamic_cast<KeyframeTrack<float>*>(selectedTrack);
+
+				float maxHeight = 1.0f;
+				for (auto& frame : Track->Frames)
+					maxHeight = std::max(maxHeight, frame.second);
+
+				//this is hacky
+				std::vector<std::pair<float, float>> tempEdits;
+				//static int32_t targetEdit = -1;
+				for (const auto& frame : Track->Frames)
+					tempEdits.emplace_back(frame.first, frame.second);
+
+				uint32_t targetEdit = -1;
+
+				std::vector<float> distances;
+				for (const auto& frame : tempEdits) //int32_t i = 0; i < tempEdits.size(); i++
+				{
+					//const auto& frame = tempEdits[i];
+					ImVec2 mousePos = ImGui::GetMousePos();
+					ImVec2 framePos((float)windowPos.x + frame.first * size.x, (float)windowPos.y + (1.0f - frame.second / maxHeight) * size.y);
+					float dist = std::hypotf(framePos.x - mousePos.x, framePos.y - mousePos.y);
+					distances.push_back(dist);
+					//if (!hasTarget && dist < 15.0f)
+					//{
+					//	hasTarget = true;
+					//	break;
+					//}
+				}
+				
+				auto it = std::min_element(distances.begin(), distances.end());
+				if (hasTarget || *it < 15.0f)
+				{
+					hasTarget = true;
+					targetEdit = it - distances.begin();
+				}
+
+
+				if (targetEdit != -1)
+				{
+					Track->Frames.clear();
+
+					tempEdits[targetEdit].first += ImGui::GetIO().MouseDelta.x / size.x;
+					tempEdits[targetEdit].second -= ImGui::GetIO().MouseDelta.y / size.y;
+
+					for (const auto& newFrame : tempEdits)
+						Track->Frames[newFrame.first] = newFrame.second;
+				}
+			}
+		}
+
 		ImGui::EndChild();
 		ImGui::PopStyleColor();
+
 		//static float arr[] = { 0.6f, 0.1f, 1.0f, 0.5f, 0.92f, 0.1f, 0.2f };
 		//ImGui::PlotLines("Frame Times", arr, IM_ARRAYSIZE(arr));
 	}
