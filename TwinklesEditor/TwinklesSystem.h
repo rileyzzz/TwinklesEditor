@@ -1,6 +1,7 @@
 #pragma once
 #include <typeinfo>
 #include <map>
+#include <string>
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include "IOArchive.h"
@@ -105,13 +106,13 @@ struct Quaternion
 	}
 };
 
-struct Color
+struct TColor
 {
 	uint8_t r = 0x00;
 	uint8_t g = 0x00;
 	uint8_t b = 0x00;
 	uint8_t a = 0xFF;
-	friend IOArchive& operator<<(IOArchive& Ar, Color& col)
+	friend IOArchive& operator<<(IOArchive& Ar, TColor& col)
 	{
 		//BGRA
 		Ar << col.b;
@@ -125,14 +126,14 @@ struct Color
 		return "R: " + std::to_string(r) + " G: " + std::to_string(g) + " B: " + std::to_string(b) + " A: " + std::to_string(a);
 	}
 
-	friend std::ostream& operator<<(std::ostream& out, const Color& col)
+	friend std::ostream& operator<<(std::ostream& out, const TColor& col)
 	{
 		out << col.DebugString();
 		return out;
 	}
 
-	Color(uint8_t InR, uint8_t InG, uint8_t InB, uint8_t InA) : r(InR), g(InG), b(InB), a(InA) { }
-	Color() { }
+	TColor(uint8_t InR, uint8_t InG, uint8_t InB, uint8_t InA) : r(InR), g(InG), b(InB), a(InA) { }
+	TColor() { }
 
 	glm::vec4 ToGLM()
 	{
@@ -158,7 +159,8 @@ class KeyframeTrackBase
 {
 public:
 	const type_info& type;
-	KeyframeTrackBase(const type_info& InType) : type(InType) { }
+	const std::string name;
+	KeyframeTrackBase(const type_info& InType, const std::string& InName) : type(InType), name(InName) { }
 	virtual ~KeyframeTrackBase() = 0;
 };
 
@@ -166,7 +168,7 @@ template <class T>
 class KeyframeTrack : public KeyframeTrackBase
 {
 public:
-	KeyframeTrack() : KeyframeTrackBase(typeid(T)) { }
+	KeyframeTrack(const std::string& name) : KeyframeTrackBase(typeid(T), name) { }
 	virtual ~KeyframeTrack() { }
 	//std::vector<Keyframe<T>> Frames;
 	std::map<float, T> Frames;
@@ -241,22 +243,22 @@ public:
 	Vector3 Position;
 	Quaternion Rotation;
 	//Frames
-	KeyframeTrack<Vector3> EmitterSize;
-	KeyframeTrack<float> EmissionRate;
-	KeyframeTrack<Vector3> VelocityCone;
-	KeyframeTrack<float> ZSpeedVariance;
+	KeyframeTrack<Vector3> EmitterSize = KeyframeTrack<Vector3>("Emitter Size");
+	KeyframeTrack<float> EmissionRate = KeyframeTrack<float>("Emission Rate");
+	KeyframeTrack<Vector3> VelocityCone = KeyframeTrack<Vector3>("Velocity Cone");
+	KeyframeTrack<float> ZSpeedVariance = KeyframeTrack<float>("Z Speed Variance");
 	ParticleType Type;
-	KeyframeTrack<float> Lifetime;
-	KeyframeTrack<float> LifetimeVariance;
-	KeyframeTrack<Vector2> SizeRange;
-	KeyframeTrack<float> SizeVariance;
-	KeyframeTrack<float> Size;
-	KeyframeTrack<Color> Color;
-	KeyframeTrack<float> MaxRotation; //radians
-	KeyframeTrack<float> Gravity;
+	KeyframeTrack<float> Lifetime = KeyframeTrack<float>("Lifetime");
+	KeyframeTrack<float> LifetimeVariance = KeyframeTrack<float>("Lifetime Variance");
+	KeyframeTrack<Vector2> SizeRange = KeyframeTrack<Vector2>("Size Range");
+	KeyframeTrack<float> SizeVariance = KeyframeTrack<float>("Size Variance");
+	KeyframeTrack<float> Size = KeyframeTrack<float>("Size");
+	KeyframeTrack<TColor> Color = KeyframeTrack<TColor>("Color");
+	KeyframeTrack<float> MaxRotation = KeyframeTrack<float>("Max Rotation"); //radians
+	KeyframeTrack<float> Gravity = KeyframeTrack<float>("Gravity");
 	float VelocityMinSpeed = -254.0;
 	float VelocityMaxSpeed = 254.0;
-	KeyframeTrack<float> WindFactor;
+	KeyframeTrack<float> WindFactor = KeyframeTrack<float>("Wind Factor");
 	Vector3 VelocityDampening;
 
 

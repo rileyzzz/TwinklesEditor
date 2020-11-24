@@ -17,23 +17,36 @@ struct EditEmitter
 {
 	uint32_t ID = 0;
 	Emitter* SourceEmitter;
-	std::map<std::string, KeyframeTrackBase*> Tracks;
+	std::vector<KeyframeTrackBase*> Tracks;
 
 	EditEmitter(Emitter* InSourceEmitter) : ID(ObjectID++), SourceEmitter(InSourceEmitter)
 	{
-		Tracks["Emitter Size"] = &SourceEmitter->EmitterSize;
-		Tracks["Emission Rate"] = &SourceEmitter->EmissionRate;
-		Tracks["Velocity Cone"] = &SourceEmitter->VelocityCone;
-		Tracks["Z Speed Variance"] = &SourceEmitter->ZSpeedVariance;
-		Tracks["Lifetime"] = &SourceEmitter->Lifetime;
-		Tracks["Lifetime Variance"] = &SourceEmitter->LifetimeVariance;
-		Tracks["Size Range"] = &SourceEmitter->SizeRange;
-		Tracks["Size Variance"] = &SourceEmitter->SizeVariance;
-		Tracks["Size"] = &SourceEmitter->Size;
-		Tracks["Color"] = &SourceEmitter->Color;
-		Tracks["Rotation Max"] = &SourceEmitter->MaxRotation;
-		Tracks["Gravity"] = &SourceEmitter->Gravity;
-		Tracks["Wind Factor"] = &SourceEmitter->WindFactor;
+		Tracks.push_back(&SourceEmitter->EmitterSize);
+		Tracks.push_back(&SourceEmitter->EmissionRate);
+		Tracks.push_back(&SourceEmitter->VelocityCone);
+		Tracks.push_back(&SourceEmitter->ZSpeedVariance);
+		Tracks.push_back(&SourceEmitter->Lifetime);
+		Tracks.push_back(&SourceEmitter->LifetimeVariance);
+		Tracks.push_back(&SourceEmitter->SizeRange);
+		Tracks.push_back(&SourceEmitter->SizeVariance);
+		Tracks.push_back(&SourceEmitter->Size);
+		Tracks.push_back(&SourceEmitter->Color);
+		Tracks.push_back(&SourceEmitter->MaxRotation);
+		Tracks.push_back(&SourceEmitter->Gravity);
+		Tracks.push_back(&SourceEmitter->WindFactor);
+		//Tracks["Emitter Size"] = &SourceEmitter->EmitterSize;
+		//Tracks["Emission Rate"] = &SourceEmitter->EmissionRate;
+		//Tracks["Velocity Cone"] = &SourceEmitter->VelocityCone;
+		//Tracks["Z Speed Variance"] = &SourceEmitter->ZSpeedVariance;
+		//Tracks["Lifetime"] = &SourceEmitter->Lifetime;
+		//Tracks["Lifetime Variance"] = &SourceEmitter->LifetimeVariance;
+		//Tracks["Size Range"] = &SourceEmitter->SizeRange;
+		//Tracks["Size Variance"] = &SourceEmitter->SizeVariance;
+		//Tracks["Size"] = &SourceEmitter->Size;
+		//Tracks["Color"] = &SourceEmitter->Color;
+		//Tracks["Rotation Max"] = &SourceEmitter->MaxRotation;
+		//Tracks["Gravity"] = &SourceEmitter->Gravity;
+		//Tracks["Wind Factor"] = &SourceEmitter->WindFactor;
 	}
 };
 
@@ -52,7 +65,7 @@ public:
 	std::vector<EditEmitter> EditEmitters;
 
 	int32_t selectedEmitter = -1;
-	std::string selectedTrack = "";
+	KeyframeTrackBase* selectedTrack = nullptr;
 
 	//Widgets
 	void DrawOutliner();

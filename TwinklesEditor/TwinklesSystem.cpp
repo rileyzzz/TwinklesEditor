@@ -127,12 +127,12 @@ Vector3 lerp(const Vector3& a, const Vector3& b, float f)
 	return Vector3(lerp(a.x, b.x, f), lerp(a.y, b.y, f), lerp(a.z, b.z, f));
 }
 
-Color lerp(const Color& a, const Color& b, float f)
+TColor lerp(const TColor& a, const TColor& b, float f)
 {
-	return Color(lerp((float)a.r, (float)b.r, f),
-				 lerp((float)a.g, (float)b.g, f),
-				 lerp((float)a.b, (float)b.b, f),
-				 lerp((float)a.a, (float)b.a, f));
+	return TColor(lerp((float)a.r, (float)b.r, f),
+				  lerp((float)a.g, (float)b.g, f),
+				  lerp((float)a.b, (float)b.b, f),
+		lerp((float)a.a, (float)b.a, f));
 }
 
 //float Emitter::GetFloatKey(float time, KeyframeTrack<float>& Track)
@@ -188,4 +188,4 @@ T KeyframeTrack<T>::GetKey(float time)
 template class KeyframeTrack<float>;
 template class KeyframeTrack<Vector2>;
 template class KeyframeTrack<Vector3>;
-template class KeyframeTrack<Color>;
+template class KeyframeTrack<TColor>;

@@ -208,7 +208,7 @@ void Editor::Draw()
 					ParticleScene->OpenFile(szFile);
 					auto& emitters = ParticleScene->ActiveSystem.Emitters;
 					selectedEmitter = -1;
-					selectedTrack = "";
+					selectedTrack = nullptr;
 					EditEmitters.clear();
 					for (auto& emit : emitters)
 						EditEmitters.emplace_back(&emit);
@@ -268,22 +268,23 @@ void Editor::DrawOutliner()
 	for (const auto& emit : EditEmitters)
 	{
 		Emitter* SourceEmitter = emit.SourceEmitter;
-		std::string name = "Emitter " + std::to_string(emit.ID);
-		if (ImGui::TreeNode(name.c_str()))
+		std::string uniqueName = "Emitter " + std::to_string(emit.ID);
+		if (ImGui::TreeNode(uniqueName.c_str()))
 		{
-			for (const auto& track : emit.Tracks)
+			for (uint32_t i = 0; i < emit.Tracks.size(); i++)
 			{
+				KeyframeTrackBase* track = emit.Tracks[i];
 				ImGuiTreeNodeFlags flags = TreeFlags;
-				if (track.first == selectedTrack)
+				if (track == selectedTrack)
 					flags |= ImGuiTreeNodeFlags_Selected;
 
-				std::string itemname = track.first + "##" + std::to_string(emit.ID);
+				std::string itemname = track->name + "##" + std::to_string(emit.ID);
 				ImGui::TreeNodeEx(itemname.c_str(), flags);
 
 				if (ImGui::IsItemClicked())
 				{
 					selectedEmitter = emit.ID;
-					selectedTrack = track.first;
+					selectedTrack = track;
 				}
 			}
 			ImGui::TreePop();
@@ -291,19 +292,48 @@ void Editor::DrawOutliner()
 	}
 }
 
+void DrawEditCursor(ImVec2 pos)
+{
+	ImDrawList* draw_list = ImGui::GetWindowDrawList();
+	draw_list->AddCircle(pos, 0.5f, 0xFF545454, 12);
+}
+
+
 void Editor::DrawGraph()
 {
-	if (selectedTrack != "")
+	if (selectedTrack)
 	{
-		ImGui::Text(selectedTrack.c_str());
+		ImGui::Text(selectedTrack->name.c_str());
 		EditEmitter& emit = EditEmitters[selectedEmitter];
-		KeyframeTrackBase* emitTrack = emit.Tracks[selectedTrack];
 		
-		if (emitTrack->type == typeid(float))
-		{
-			auto* Track = dynamic_cast<KeyframeTrack<float>*>(emitTrack);
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2f, 0.2f, 0.2f, 0.5f));
+		ImGui::BeginChild("Graph", ImVec2(0, 0), true);
+		ImVec2 size = ImGui::GetWindowSize();
+		ImVec2 windowPos = ImGui::GetWindowPos();
+		std::cout << "size x " << size.x << "\n";
+		ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
+		ImU32 lineColor(0xFF545454);
+		for (uint32_t i = 0; i < size.x; i += size.x / 20)
+			draw_list->AddLine(ImVec2(windowPos.x + i, windowPos.y), ImVec2(windowPos.x + i, windowPos.y + size.y), lineColor);
+
+		for (uint32_t i = 0; i < size.y; i += size.y / 4)
+			draw_list->AddLine(ImVec2(windowPos.x, windowPos.y + i), ImVec2(windowPos.x + size.x, windowPos.y + i), lineColor);
+
+		
+		if (selectedTrack->type == typeid(float))
+		{
+			auto* Track = dynamic_cast<KeyframeTrack<float>*>(selectedTrack);
+			for (auto& frame : Track->Frames)
+			{
+				float x = frame.first * size.x;
+				float y = (1.0f - frame.second) * size.y;
+				ImVec2 pos((float)windowPos.x + x, (float)windowPos.y + y);
+				DrawEditCursor(pos);
+			}
 		}
+		ImGui::EndChild();
+		ImGui::PopStyleColor();
 		//static float arr[] = { 0.6f, 0.1f, 1.0f, 0.5f, 0.92f, 0.1f, 0.2f };
 		//ImGui::PlotLines("Frame Times", arr, IM_ARRAYSIZE(arr));
 	}
