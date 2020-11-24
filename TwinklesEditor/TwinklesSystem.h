@@ -170,6 +170,8 @@ public:
 	virtual ~KeyframeTrack() { }
 	//std::vector<Keyframe<T>> Frames;
 	std::map<float, T> Frames;
+	//std::vector<float, uint32_t> Ranges;
+
 	bool Serialize(IOArchive& Ar)
 	{
 		uint32_t FrameNum = Frames.size();
@@ -201,6 +203,7 @@ public:
 		}
 		return true;
 	}
+
 
 	std::pair<float, T> GetLastFrame(float time)
 	{

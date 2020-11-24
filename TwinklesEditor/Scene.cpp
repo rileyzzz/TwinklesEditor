@@ -340,44 +340,50 @@ uint32_t RenderEmitter::FirstUnusedParticle()
 #define randfloat() ((float)std::rand() / (float)RAND_MAX - 0.5f) * 2.0f
 void RenderEmitter::ParticleRespawn(RenderParticle& particle)
 {
-	//float random = (float)std::rand() / (float)RAND_MAX;
-	particle.Rand = (float)std::rand() / (float)RAND_MAX;
+	float EmitterTime = 1.0f - EmitterLife;
+
 
 	particle.Position = SourceEmitter.Position.ToGLM();
 
-	glm::vec3 EmitterSize = SourceEmitter.EmitterSize.GetKey(0.0f).ToGLM();
+	glm::vec3 EmitterSize = SourceEmitter.EmitterSize.GetKey(EmitterTime).ToGLM();
 	particle.Position.x += EmitterSize.x * randfloat();
 	particle.Position.y += EmitterSize.y * randfloat();
 	particle.Position.z += EmitterSize.z * randfloat();
 
 
-	//particle.Transform = glm::mat4();
-	//particle.Transform = glm::translate(particle.Transform, SourceEmitter.Position.ToGLM());
 	particle.Color = SourceEmitter.Color.GetKey(0.0f).ToGLM();
 	particle.Life = 1.0f;
+
+	const float Lifetime = SourceEmitter.Lifetime.GetKey(EmitterTime);
+	const float LifetimeVariance = SourceEmitter.LifetimeVariance.GetKey(EmitterTime);
+
+	particle.Lifetime = (Lifetime + (LifetimeVariance * randfloat()));
+
+
 	//z is fixed, x and y vary
-	glm::vec3 VelocityCone = SourceEmitter.VelocityCone.GetKey(0.0f).ToGLM();
+	glm::vec3 VelocityCone = SourceEmitter.VelocityCone.GetKey(EmitterTime).ToGLM();
 	VelocityCone.x *= randfloat();
 	VelocityCone.y *= randfloat();
-	VelocityCone.z += SourceEmitter.ZSpeedVariance.GetKey(0.0f) * randfloat();
+	VelocityCone.z += SourceEmitter.ZSpeedVariance.GetKey(EmitterTime) * randfloat();
 	particle.Velocity = VelocityCone;
-
-	//glm::quat testRot(glm::vec3(-45.0f, 0.0f, 0.0f));
-	//std::cout << "rotation " << SourceEmitter.Rotation.x << " " << SourceEmitter.Rotation.y << " " << SourceEmitter.Rotation.z << " " << SourceEmitter.Rotation.w << "\n";
-	//std::cout << "rotation " << testRot.x << " " << testRot.y << " " << testRot.z << " " << testRot.w << "\n";
+	particle.gravity = SourceEmitter.Gravity.GetKey(EmitterTime) / 40.0f;
 
 	glm::mat4 rotationMat(SourceEmitter.Rotation.ToGLM());
 	particle.Velocity = glm::vec3(rotationMat * glm::vec4(particle.Velocity, 1.0f));
 
-	particle.RotationRate = SourceEmitter.MaxRotation.GetKey(0.0f) * randfloat();
+	particle.RotationRate = SourceEmitter.MaxRotation.GetKey(EmitterTime) * randfloat();
 
 	//size_control*(max_size-min_size) + size_control*size_variance
+	
+
 	float size_control = SourceEmitter.Size.GetKey(0.0f);
-	glm::vec2 MinMax = SourceEmitter.SizeRange.GetKey(0.0f).ToGLM();
+	glm::vec2 MinMax = SourceEmitter.SizeRange.GetKey(EmitterTime).ToGLM();
 	float min_size = MinMax.x;
 	float max_size = MinMax.y;
-	float size_variance = SourceEmitter.SizeVariance.GetKey(0.0f) * particle.Rand;
+	float size_variance = SourceEmitter.SizeVariance.GetKey(EmitterTime) * ((float)std::rand() / (float)RAND_MAX);
 
+	particle.sizeVariance = size_variance;
+	particle.MinMax = MinMax;
 	if (max_size < min_size)
 		max_size = min_size;
 	particle.Size = size_control * (max_size - min_size) + size_control * size_variance;
@@ -415,9 +421,17 @@ void RenderEmitter::SetTexture(const char* path)
 
 void RenderEmitter::EmitterTick(float deltaTime)
 {
+	if(!EmitterPaused)
+		EmitterLife -= deltaTime / EmitterLifetime;
+
+	if (EmitterLife <= 0.0f)
+		EmitterLife = 1.0f;
+
+	const float EmitterTime = 1.0f - EmitterLife;
+
 	//Spawn new particles
 	particleAccumulator += deltaTime;
-	const float SecondsPerParticle = 1.0f / SourceEmitter.EmissionRate.GetKey(0.0f);
+	const float SecondsPerParticle = 1.0f / SourceEmitter.EmissionRate.GetKey(EmitterTime);
 	while(particleAccumulator > SecondsPerParticle) //seconds / particle
 	{
 		particleAccumulator -= SecondsPerParticle;
@@ -426,33 +440,38 @@ void RenderEmitter::EmitterTick(float deltaTime)
 		ParticleRespawn(particles[FirstUnused]);
 	}
 
-	float Lifetime = SourceEmitter.Lifetime.GetKey(0.0f);
-	float LifetimeVariance = SourceEmitter.LifetimeVariance.GetKey(0.0f);
 
 	//Update particles
 	for (auto& particle : particles)
 	{
-		particle.Life -= deltaTime / (Lifetime + LifetimeVariance * ((particle.Rand - 0.5f) * 2.0f));
+		//per particle, different start time
+		//const float Lifetime = SourceEmitter.Lifetime.GetKey(particle.startTime);
+		//const float LifetimeVariance = SourceEmitter.LifetimeVariance.GetKey(particle.startTime);
+
+		particle.Life -= deltaTime / particle.Lifetime;
 		if (particle.Life > 0.0f)
 		{
-			particle.Velocity.z -= SourceEmitter.Gravity.GetKey(1.0f - particle.Life) / 40.0f;
+			const float ParticleTime = 1.0f - particle.Life;
+
+			particle.Velocity.z -= particle.gravity;
+
 			//particle.Transform = glm::translate(particle.Transform, particle.Velocity * deltaTime);
 			//particle.
 			particle.Position += particle.Velocity * deltaTime;
-			particle.Color = SourceEmitter.Color.GetKey(1.0f - particle.Life).ToGLM();
+			particle.Color = SourceEmitter.Color.GetKey(ParticleTime).ToGLM();
 			particle.Rotation += particle.RotationRate;
 
-			float size_control = SourceEmitter.Size.GetKey(1.0f - particle.Life);
+			float size_control = SourceEmitter.Size.GetKey(ParticleTime);
 			//0 on purpose
-			glm::vec2 MinMax = SourceEmitter.SizeRange.GetKey(0.0f).ToGLM();
-			float min_size = MinMax.x;
-			float max_size = MinMax.y;
+			//glm::vec2 MinMax = SourceEmitter.SizeRange.GetKey(particle.startTime).ToGLM();
+			float min_size = particle.MinMax.x;
+			float max_size = particle.MinMax.y;
 			//0 on purpose
-			float size_variance = SourceEmitter.SizeVariance.GetKey(0.0f) * particle.Rand; // * randfloat()
+			//float size_variance = SourceEmitter.SizeVariance.GetKey(particle.startTime) * particle.Rand;
 			
 			if (max_size < min_size)
 				max_size = min_size;
-			particle.Size = size_control * (max_size - min_size) + size_control * size_variance;
+			particle.Size = size_control * (max_size - min_size) + size_control * particle.sizeVariance;
 			particle.Size = std::clamp(particle.Size, min_size, max_size);
 		}
 	}

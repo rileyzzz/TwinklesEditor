@@ -30,15 +30,22 @@ struct RenderParticle
 
 	float Rotation;
 
-	//Not sent to particle shader
-	float Rand; //per particle random
+	//Not sent to particle shader, initial properties at time of emission
+	//float Rand; //per particle random
 
 	float RotationRate;
 
+	float Lifetime;
+
+	float sizeVariance;
+
+	float gravity;
+
+	glm::vec2 MinMax;
 	//glm::mat4 Transform;
 
 	//Position(0.0f),
-	RenderParticle() : Velocity(0.0f), Color(1.0f), Size(1.0f), Life(0.0f), Rotation(0.0f), Rand(0.0f), RotationRate(0.0f) {}
+	RenderParticle() : Velocity(0.0f), Color(1.0f), Size(1.0f), Life(0.0f), Rotation(0.0f), RotationRate(0.0f), Lifetime(0.0f), sizeVariance(0.0f), gravity(0.0f), MinMax(0.0f) {}
 };
 
 class Scene;
@@ -49,6 +56,10 @@ private:
 	Emitter& SourceEmitter;
 	const uint32_t particleCount = 10000;
 	std::vector<RenderParticle> particles;
+
+	bool EmitterPaused = true;
+	float EmitterLife = 1.0f;
+	const float EmitterLifetime = 1.0f;
 
 	float particleAccumulator = 0.0f;
 	uint32_t FirstUnusedParticle();
