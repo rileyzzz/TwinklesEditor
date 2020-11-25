@@ -344,14 +344,34 @@ void Editor::DrawGraph()
 		if (selectedTrack->type == typeid(float))
 		{
 			auto* Track = dynamic_cast<KeyframeTrack<float>*>(selectedTrack);
+			auto& Frames = Track->Frames;
+
+			std::vector<size_t> sortedMap(Frames.size());
+			std::iota(sortedMap.begin(), sortedMap.end(), 0);
+			std::sort(sortedMap.begin(), sortedMap.end(),
+				[Frames](size_t a, size_t b) { return Frames[a].first < Frames[b].first; });
+
+			
 
 			float maxHeight = 1.0f;
-			for (auto& frame : Track->Frames)
-				maxHeight = std::max(maxHeight, frame.second);
-
-
-			for (auto& frame : Track->Frames)
+			if (selectedFrame == -1)
 			{
+				for (auto& frame : Frames)
+					maxHeight = std::max(maxHeight, frame.second);
+			}
+			else
+				maxHeight = activeEditMax;
+			
+			std::cout << "max height " << maxHeight << "\n";
+
+			//static std::pair<float, float>* selectedFramePtr = nullptr;
+
+			for (uint32_t i = 0; i < Frames.size(); i++)
+			{
+				//sorted
+				//auto& frame = Frames[sortedMap[i]];
+				auto& frame = Frames[i];
+
 				float x = frame.first * size.x;
 				float y = (1.0f - frame.second / maxHeight) * size.y;
 				ImVec2 pos((float)windowPos.x + x, (float)windowPos.y + y);
@@ -367,10 +387,31 @@ void Editor::DrawGraph()
 				
 				DrawEditCursor(pos);
 
-				//if (ImGui::IsItemActive())
-				//{
+				if (selectedFrame == -1 && ImGui::IsItemActive()) //selectedFrame == -1 
+				{
+					ImVec2 mousePos = ImGui::GetMousePos();
+					float dist = std::hypotf(pos.x - mousePos.x, pos.y - mousePos.y);
 
-				//}
+					if (dist < 15.0f)
+					{ 
+						selectedFrame = sortedMap[i];
+						activeEditMax = maxHeight;
+						//selectedFramePtr = &frame;
+						//std::cout << "now selected " << selectedFrame << "\n";
+					}
+				}
+			}
+
+			if (selectedFrame != -1)
+			{
+				auto& editFrame = Frames[selectedFrame];
+				if(editFrame.first != 0.0f && editFrame.first != 1.0f)
+					editFrame.first += (ImGui::GetIO().MouseDelta.x / size.x);
+				editFrame.second -= (ImGui::GetIO().MouseDelta.y * maxHeight) / size.y;
+
+				auto FrameCopy = Frames[selectedFrame];
+				std::sort(Frames.begin(), Frames.end());
+				selectedFrame = std::find(Frames.begin(), Frames.end(), FrameCopy) - Frames.begin();
 			}
 		}
 		//ImGui::EndChild();
@@ -382,66 +423,67 @@ void Editor::DrawGraph()
 		//	pendingChanges = true;
 
 		//}
-		static bool hasTarget = false;
+		//static bool hasTarget = false;
 		//static std::pair<float, float> targetEdit = std::make_pair<float, float>(-1.0f, -1.0f);
 
 		if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
-			hasTarget = false;
-
-		if (ImGui::IsItemActive())
-		{
-			if (selectedTrack->type == typeid(float))
-			{
-				
-				auto* Track = dynamic_cast<KeyframeTrack<float>*>(selectedTrack);
-
-				float maxHeight = 1.0f;
-				for (auto& frame : Track->Frames)
-					maxHeight = std::max(maxHeight, frame.second);
-
-				//this is hacky
-				std::vector<std::pair<float, float>> tempEdits;
-				//static int32_t targetEdit = -1;
-				for (const auto& frame : Track->Frames)
-					tempEdits.emplace_back(frame.first, frame.second);
-
-				uint32_t targetEdit = -1;
-
-				std::vector<float> distances;
-				for (const auto& frame : tempEdits) //int32_t i = 0; i < tempEdits.size(); i++
-				{
-					//const auto& frame = tempEdits[i];
-					ImVec2 mousePos = ImGui::GetMousePos();
-					ImVec2 framePos((float)windowPos.x + frame.first * size.x, (float)windowPos.y + (1.0f - frame.second / maxHeight) * size.y);
-					float dist = std::hypotf(framePos.x - mousePos.x, framePos.y - mousePos.y);
-					distances.push_back(dist);
-					//if (!hasTarget && dist < 15.0f)
-					//{
-					//	hasTarget = true;
-					//	break;
-					//}
-				}
-				
-				auto it = std::min_element(distances.begin(), distances.end());
-				if (hasTarget || *it < 15.0f)
-				{
-					hasTarget = true;
-					targetEdit = it - distances.begin();
-				}
+			selectedFrame = -1;
 
 
-				if (targetEdit != -1)
-				{
-					Track->Frames.clear();
+		//if (ImGui::IsItemActive())
+		//{
+		//	if (selectedTrack->type == typeid(float))
+		//	{
+		//		
+		//		auto* Track = dynamic_cast<KeyframeTrack<float>*>(selectedTrack);
 
-					tempEdits[targetEdit].first += ImGui::GetIO().MouseDelta.x / size.x;
-					tempEdits[targetEdit].second -= ImGui::GetIO().MouseDelta.y / size.y;
+		//		float maxHeight = 1.0f;
+		//		for (auto& frame : Track->Frames)
+		//			maxHeight = std::max(maxHeight, frame.second);
 
-					for (const auto& newFrame : tempEdits)
-						Track->Frames[newFrame.first] = newFrame.second;
-				}
-			}
-		}
+		//		//this is hacky
+		//		std::vector<std::pair<float, float>> tempEdits;
+		//		//static int32_t targetEdit = -1;
+		//		for (const auto& frame : Track->Frames)
+		//			tempEdits.emplace_back(frame.first, frame.second);
+
+		//		uint32_t targetEdit = -1;
+
+		//		std::vector<float> distances;
+		//		for (const auto& frame : tempEdits) //int32_t i = 0; i < tempEdits.size(); i++
+		//		{
+		//			//const auto& frame = tempEdits[i];
+		//			ImVec2 mousePos = ImGui::GetMousePos();
+		//			ImVec2 framePos((float)windowPos.x + frame.first * size.x, (float)windowPos.y + (1.0f - frame.second / maxHeight) * size.y);
+		//			float dist = std::hypotf(framePos.x - mousePos.x, framePos.y - mousePos.y);
+		//			distances.push_back(dist);
+		//			//if (!hasTarget && dist < 15.0f)
+		//			//{
+		//			//	hasTarget = true;
+		//			//	break;
+		//			//}
+		//		}
+		//		
+		//		auto it = std::min_element(distances.begin(), distances.end());
+		//		if (hasTarget || *it < 15.0f)
+		//		{
+		//			hasTarget = true;
+		//			targetEdit = it - distances.begin();
+		//		}
+
+
+		//		if (targetEdit != -1)
+		//		{
+		//			Track->Frames.clear();
+
+		//			tempEdits[targetEdit].first += ImGui::GetIO().MouseDelta.x / size.x;
+		//			tempEdits[targetEdit].second -= ImGui::GetIO().MouseDelta.y / size.y;
+
+		//			for (const auto& newFrame : tempEdits)
+		//				Track->Frames[newFrame.first] = newFrame.second;
+		//		}
+		//	}
+		//}
 
 		ImGui::EndChild();
 		ImGui::PopStyleColor();

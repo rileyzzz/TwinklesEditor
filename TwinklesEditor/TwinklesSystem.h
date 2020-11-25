@@ -171,7 +171,8 @@ public:
 	KeyframeTrack(const std::string& name) : KeyframeTrackBase(typeid(T), name) { }
 	virtual ~KeyframeTrack() { }
 	//std::vector<Keyframe<T>> Frames;
-	std::map<float, T> Frames;
+	//std::map<float, T> Frames;
+	std::vector<std::pair<float, T>> Frames;
 	//std::vector<float, uint32_t> Ranges;
 
 	bool Serialize(IOArchive& Ar)
@@ -189,7 +190,8 @@ public:
 				T value;
 				Ar << key;
 				Ar << value;
-				Frames[key] = value;
+				//Frames[key] = value;
+				Frames.emplace_back(key, value);
 				std::cout << key << ": " << value << "\n";
 			}
 		}

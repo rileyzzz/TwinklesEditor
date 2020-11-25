@@ -431,7 +431,7 @@ void RenderEmitter::EmitterTick(float deltaTime)
 
 	//Spawn new particles
 	particleAccumulator += deltaTime;
-	const float SecondsPerParticle = 1.0f / SourceEmitter.EmissionRate.GetKey(EmitterTime);
+	const float SecondsPerParticle = 1.0f / std::max(SourceEmitter.EmissionRate.GetKey(EmitterTime), 0.001f);
 	while(particleAccumulator > SecondsPerParticle) //seconds / particle
 	{
 		particleAccumulator -= SecondsPerParticle;

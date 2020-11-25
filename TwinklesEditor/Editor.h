@@ -1,6 +1,7 @@
 #pragma once
 #include <map>
 #include <filesystem>
+#include <numeric>
 #define NOMINMAX
 #include <windows.h>
 #include <SDL.h>
@@ -65,6 +66,11 @@ public:
 	std::vector<EditEmitter> EditEmitters;
 
 	int32_t selectedEmitter = -1;
+	int32_t selectedFrame = -1;
+	float activeEditMax = 1.0f;
+	//std::pair<float, float>* selectedFramePtr = nullptr;
+	//std::pair<float, float>* selectedFloatFrame = nullptr;
+
 	KeyframeTrackBase* selectedTrack = nullptr;
 
 	//Widgets
