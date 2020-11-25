@@ -540,6 +540,56 @@ void RenderEmitter::DrawParticles()
 	glUseProgram(0);
 }
 
+void RenderEmitter::DrawAttachments()
+{
+	const float EmitterTime = 1.0f - EmitterLife;
+
+	glPushMatrix();
+	glTranslatef(SourceEmitter.Position.x, SourceEmitter.Position.y, SourceEmitter.Position.z);
+	glm::mat4 rotationMat(SourceEmitter.Rotation.ToGLM());
+	glMultMatrixf(glm::value_ptr(rotationMat));
+
+	glColor3f(0.4f, 0.4f, 0.4f);
+	if (ShowVelocityCone)
+	{
+		glm::vec3 VelocityCone = SourceEmitter.VelocityCone.GetKey(EmitterTime).ToGLM();
+
+		glBegin(GL_LINES);
+
+		glVertex3f(0.0f, 0.0f, 0.0f); glVertex3f(VelocityCone.x, VelocityCone.y, VelocityCone.z);
+		glVertex3f(0.0f, 0.0f, 0.0f); glVertex3f(-VelocityCone.x, VelocityCone.y, VelocityCone.z);
+		glVertex3f(0.0f, 0.0f, 0.0f); glVertex3f(VelocityCone.x, -VelocityCone.y, VelocityCone.z);
+		glVertex3f(0.0f, 0.0f, 0.0f); glVertex3f(-VelocityCone.x, -VelocityCone.y, VelocityCone.z);
+
+		glVertex3f(VelocityCone.x, VelocityCone.y, VelocityCone.z); glVertex3f(-VelocityCone.x, VelocityCone.y, VelocityCone.z);
+		glVertex3f(-VelocityCone.x, VelocityCone.y, VelocityCone.z); glVertex3f(-VelocityCone.x, -VelocityCone.y, VelocityCone.z);
+		glVertex3f(-VelocityCone.x, -VelocityCone.y, VelocityCone.z); glVertex3f(VelocityCone.x, -VelocityCone.y, VelocityCone.z);
+		glVertex3f(VelocityCone.x, -VelocityCone.y, VelocityCone.z); glVertex3f(VelocityCone.x, VelocityCone.y, VelocityCone.z);
+
+		glEnd();
+	}
+
+	if (ShowEmitterSize)
+	{
+		glm::vec3 EmitterSize = SourceEmitter.EmitterSize.GetKey(EmitterTime).ToGLM();
+		glBegin(GL_LINES);
+		glVertex3f(EmitterSize.x, EmitterSize.y, EmitterSize.z); glVertex3f(-EmitterSize.x, EmitterSize.y, EmitterSize.z);
+		glVertex3f(-EmitterSize.x, EmitterSize.y, EmitterSize.z); glVertex3f(-EmitterSize.x, -EmitterSize.y, EmitterSize.z);
+		glVertex3f(-EmitterSize.x, -EmitterSize.y, EmitterSize.z); glVertex3f(EmitterSize.x, -EmitterSize.y, EmitterSize.z);
+		glVertex3f(EmitterSize.x, -EmitterSize.y, EmitterSize.z); glVertex3f(EmitterSize.x, EmitterSize.y, EmitterSize.z);
+		glVertex3f(EmitterSize.x, EmitterSize.y, -EmitterSize.z); glVertex3f(-EmitterSize.x, EmitterSize.y, -EmitterSize.z);
+		glVertex3f(-EmitterSize.x, EmitterSize.y, -EmitterSize.z); glVertex3f(-EmitterSize.x, -EmitterSize.y, -EmitterSize.z);
+		glVertex3f(-EmitterSize.x, -EmitterSize.y, -EmitterSize.z); glVertex3f(EmitterSize.x, -EmitterSize.y, -EmitterSize.z);
+		glVertex3f(EmitterSize.x, -EmitterSize.y, -EmitterSize.z); glVertex3f(EmitterSize.x, EmitterSize.y, -EmitterSize.z);
+		glVertex3f(EmitterSize.x, EmitterSize.y, EmitterSize.z); glVertex3f(EmitterSize.x, EmitterSize.y, -EmitterSize.z);
+		glVertex3f(-EmitterSize.x, EmitterSize.y, EmitterSize.z); glVertex3f(-EmitterSize.x, EmitterSize.y, -EmitterSize.z);
+		glVertex3f(-EmitterSize.x, -EmitterSize.y, EmitterSize.z); glVertex3f(-EmitterSize.x, -EmitterSize.y, -EmitterSize.z);
+		glVertex3f(EmitterSize.x, -EmitterSize.y, EmitterSize.z); glVertex3f(EmitterSize.x, -EmitterSize.y, -EmitterSize.z);
+		glEnd();
+	}
+	glPopMatrix();
+}
+
 void Scene::Render(float deltaTime)
 {
 
@@ -586,6 +636,9 @@ void Scene::Render(float deltaTime)
 	for (auto& emitter : Emitters)
 		emitter.DrawParticles();
 	glDepthMask(GL_TRUE);
+
+	for (auto& emitter : Emitters)
+		emitter.DrawAttachments();
 	//glMatrixMode(GL_MODELVIEW);
 	//glLoadIdentity();
 

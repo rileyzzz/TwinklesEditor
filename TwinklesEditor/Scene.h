@@ -74,9 +74,13 @@ private:
 
 	Scene* parentScene;
 public:
+	bool ShowEmitterSize = true;
+	bool ShowVelocityCone = true;
+
 	void SetTexture(const char* path);
 	void EmitterTick(float deltaTime);
 	void DrawParticles();
+	void DrawAttachments();
 	RenderEmitter(Emitter& emit, Scene* InScene);
 };
 
