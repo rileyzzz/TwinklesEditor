@@ -61,8 +61,11 @@ public:
 	Editor(int in_argc, char** in_argv);
 	~Editor();
 
-	void Draw();
+	ImFont* MainFont = nullptr;
+	ImFont* SmallFont = nullptr;
 
+	void Draw();
+	
 	std::vector<EditEmitter> EditEmitters;
 
 	int32_t selectedEmitter = -1;

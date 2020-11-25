@@ -34,7 +34,8 @@ Editor::Editor(int argc, char** argv)
 	ImFontConfig config;
 	config.OversampleH = 3;
 	config.OversampleV = 1;
-	auto MainFont = io.Fonts->AddFontFromFileTTF((ApplicationDir.string() + "/Roboto-Regular.ttf").c_str(), 18.0f, &config);
+	MainFont = io.Fonts->AddFontFromFileTTF((ApplicationDir.string() + "/Roboto-Regular.ttf").c_str(), 18.0f, &config);
+	SmallFont = io.Fonts->AddFontFromFileTTF((ApplicationDir.string() + "/Roboto-Regular.ttf").c_str(), 12.0f, &config);
 
 
 	ImGui_ImplSDL2_InitForOpenGL(window, glcontext);
@@ -292,12 +293,12 @@ void Editor::DrawOutliner()
 	}
 }
 
-void DrawEditCursor(ImVec2 pos)
+void DrawEditCursor(ImVec2 pos, bool selected)
 {
 	ImDrawList* draw_list = ImGui::GetWindowDrawList();
 	constexpr float size = 8.0f;
 	draw_list->AddCircle(pos, size, 0xFF808080, 12);
-	draw_list->AddCircle(pos, size + 1, 0xFFA8A8A8, 12);
+	draw_list->AddCircle(pos, size + 1, selected ? 0xFF14FF14 : 0xFFA8A8A8, 12);
 }
 
 void DrawGraphLine(ImVec2 A, ImVec2 B)
@@ -312,6 +313,11 @@ void DrawGraphLine(ImVec2 A, ImVec2 B)
 //
 //}
 
+inline bool InsideContainer(ImVec2 test, ImVec2 a, ImVec2 b)
+{
+	return test.x > a.x && test.y > a.y && test.x < b.x && test.y < b.y;
+}
+
 void Editor::DrawGraph()
 {
 	if (selectedTrack)
@@ -320,49 +326,66 @@ void Editor::DrawGraph()
 		EditEmitter& emit = EditEmitters[selectedEmitter];
 		
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2f, 0.2f, 0.2f, 0.25f));
-		ImGui::BeginChild("Graph", ImVec2(0, 0), true);
+		ImGui::BeginChild("Graph", ImVec2(-64.0f, 0.0f), true);
 		ImVec2 size = ImGui::GetWindowContentRegionMax();
 		ImVec2 windowPos = ImGui::GetWindowPos();
 		ImVec2 contentMin = ImGui::GetWindowContentRegionMin();
 		windowPos.x += contentMin.x / 2;
 		windowPos.y += contentMin.y / 2;
+
+		ImVec2 screenContentMax = windowPos;
+		screenContentMax.x += size.x;
+		screenContentMax.y += size.y;
+
 		//ImVec2 windowPos = ImGui::GetWindowContentRegionMin();
 
 		//std::map<KeyframeTrack<float>*, float>
 		//std::cout << "pos " << windowPos.x << " " << windowPos.y << "\n";
 		//std::cout << "size " << size.x << " " << size.y << "\n";
+
+		float maxHeight = 1.0f;
+		if (selectedTrack->type == typeid(float))
+		{
+			auto* Track = dynamic_cast<KeyframeTrack<float>*>(selectedTrack);
+			if (selectedFrame == -1)
+			{
+				for (auto& frame : Track->Frames)
+					maxHeight = std::max(maxHeight, frame.second);
+			}
+			else
+				maxHeight = activeEditMax;
+		}
+
 		ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
 		ImU32 lineColor(0xFF545454);
 		for (float i = 0.0f; i < size.x; i += size.x / 20.0f)
 			draw_list->AddLine(ImVec2(windowPos.x + i, windowPos.y), ImVec2(windowPos.x + i, windowPos.y + size.y), lineColor);
 
-		for (float i = 0.0f; i < size.y; i += size.y / 4.0f)
-			draw_list->AddLine(ImVec2(windowPos.x, windowPos.y + i), ImVec2(windowPos.x + size.x, windowPos.y + i), lineColor);
+		/*for (float i = 0.0f; i < size.y; i += size.y / 4.0f)
+			draw_list->AddLine(ImVec2(windowPos.x, windowPos.y + i), ImVec2(windowPos.x + size.x, windowPos.y + i), lineColor);*/
 
+		constexpr float unitSpacing = 10.0f;
+		for (float i = 0.0f; i <= maxHeight; i += maxHeight / unitSpacing)
+		{
+			float y = screenContentMax.y - (i / maxHeight) * size.y;
+			draw_list->AddLine(ImVec2(windowPos.x, y), ImVec2(windowPos.x + size.x, y), lineColor);
+		}
+
+		
 
 		if (selectedTrack->type == typeid(float))
 		{
 			auto* Track = dynamic_cast<KeyframeTrack<float>*>(selectedTrack);
 			auto& Frames = Track->Frames;
 
+
+			ImVec2 mousePos = ImGui::GetMousePos();
+
 			std::vector<size_t> sortedMap(Frames.size());
 			std::iota(sortedMap.begin(), sortedMap.end(), 0);
 			std::sort(sortedMap.begin(), sortedMap.end(),
 				[Frames](size_t a, size_t b) { return Frames[a].first < Frames[b].first; });
-
-			
-
-			float maxHeight = 1.0f;
-			if (selectedFrame == -1)
-			{
-				for (auto& frame : Frames)
-					maxHeight = std::max(maxHeight, frame.second);
-			}
-			else
-				maxHeight = activeEditMax;
-			
-			std::cout << "max height " << maxHeight << "\n";
 
 			//static std::pair<float, float>* selectedFramePtr = nullptr;
 
@@ -385,11 +408,21 @@ void Editor::DrawGraph()
 					DrawGraphLine(pos, nextPos);
 				}
 				
-				DrawEditCursor(pos);
+				DrawEditCursor(pos, selectedFrame == sortedMap[i]);
+				if (selectedFrame == sortedMap[i])
+				{
+					auto& frame = Frames[selectedFrame];
+					ImGui::BeginTooltip();
+					std::stringstream first;
+					first << std::setprecision(4) << std::noshowpoint << frame.first;
+					first << ", ";
+					first << std::setprecision(4) << std::noshowpoint << frame.second;
+					ImGui::Text(first.str().c_str());
+					ImGui::EndTooltip();
+				}
 
 				if (selectedFrame == -1 && ImGui::IsItemActive()) //selectedFrame == -1 
 				{
-					ImVec2 mousePos = ImGui::GetMousePos();
 					float dist = std::hypotf(pos.x - mousePos.x, pos.y - mousePos.y);
 
 					if (dist < 15.0f)
@@ -402,11 +435,44 @@ void Editor::DrawGraph()
 				}
 			}
 
+			bool MouseInside = InsideContainer(mousePos, windowPos, screenContentMax);
+			if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && MouseInside)
+			{
+				float first = (mousePos.x - windowPos.x) / size.x;
+				float second = (1.0f - ((mousePos.y - windowPos.y) / size.y)) * maxHeight;
+				selectedFrame = Frames.size();
+				activeEditMax = maxHeight;
+				Frames.emplace_back(first, second);
+			}
+
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && selectedFrame == -1 && MouseInside)
+			{
+				for (auto& frame : Frames)
+				{
+					if (frame.first != 0.0f && frame.first != 1.0f)
+					{
+						float x = frame.first * size.x;
+						float y = (1.0f - frame.second / maxHeight) * size.y;
+						ImVec2 pos(windowPos.x + x, windowPos.y + y);
+
+						float dist = std::hypotf(pos.x - mousePos.x, pos.y - mousePos.y);
+						if (dist < 15.0f)
+						{
+							std::remove(Frames.begin(), Frames.end(), frame);
+							break;
+						}
+					}
+				}
+			}
+
 			if (selectedFrame != -1)
 			{
 				auto& editFrame = Frames[selectedFrame];
-				if(editFrame.first != 0.0f && editFrame.first != 1.0f)
+				if (editFrame.first != 0.0f && editFrame.first != 1.0f)
+				{
 					editFrame.first += (ImGui::GetIO().MouseDelta.x / size.x);
+					editFrame.first = std::clamp(editFrame.first, 0.001f, 0.999f);
+				}
 				editFrame.second -= (ImGui::GetIO().MouseDelta.y * maxHeight) / size.y;
 
 				auto FrameCopy = Frames[selectedFrame];
@@ -429,64 +495,20 @@ void Editor::DrawGraph()
 		if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
 			selectedFrame = -1;
 
-
-		//if (ImGui::IsItemActive())
-		//{
-		//	if (selectedTrack->type == typeid(float))
-		//	{
-		//		
-		//		auto* Track = dynamic_cast<KeyframeTrack<float>*>(selectedTrack);
-
-		//		float maxHeight = 1.0f;
-		//		for (auto& frame : Track->Frames)
-		//			maxHeight = std::max(maxHeight, frame.second);
-
-		//		//this is hacky
-		//		std::vector<std::pair<float, float>> tempEdits;
-		//		//static int32_t targetEdit = -1;
-		//		for (const auto& frame : Track->Frames)
-		//			tempEdits.emplace_back(frame.first, frame.second);
-
-		//		uint32_t targetEdit = -1;
-
-		//		std::vector<float> distances;
-		//		for (const auto& frame : tempEdits) //int32_t i = 0; i < tempEdits.size(); i++
-		//		{
-		//			//const auto& frame = tempEdits[i];
-		//			ImVec2 mousePos = ImGui::GetMousePos();
-		//			ImVec2 framePos((float)windowPos.x + frame.first * size.x, (float)windowPos.y + (1.0f - frame.second / maxHeight) * size.y);
-		//			float dist = std::hypotf(framePos.x - mousePos.x, framePos.y - mousePos.y);
-		//			distances.push_back(dist);
-		//			//if (!hasTarget && dist < 15.0f)
-		//			//{
-		//			//	hasTarget = true;
-		//			//	break;
-		//			//}
-		//		}
-		//		
-		//		auto it = std::min_element(distances.begin(), distances.end());
-		//		if (hasTarget || *it < 15.0f)
-		//		{
-		//			hasTarget = true;
-		//			targetEdit = it - distances.begin();
-		//		}
-
-
-		//		if (targetEdit != -1)
-		//		{
-		//			Track->Frames.clear();
-
-		//			tempEdits[targetEdit].first += ImGui::GetIO().MouseDelta.x / size.x;
-		//			tempEdits[targetEdit].second -= ImGui::GetIO().MouseDelta.y / size.y;
-
-		//			for (const auto& newFrame : tempEdits)
-		//				Track->Frames[newFrame.first] = newFrame.second;
-		//		}
-		//	}
-		//}
-
 		ImGui::EndChild();
 		ImGui::PopStyleColor();
+
+		//draw units
+		ImGui::PushFont(SmallFont);
+		for (float i = 0.0f; i <= maxHeight; i += maxHeight / unitSpacing)
+		{
+			float y = screenContentMax.y - (i / maxHeight) * size.y;
+			ImVec2 pos(screenContentMax.x + 8, y - 8);
+			std::stringstream text;
+			text << std::setprecision(4) << std::noshowpoint << i;
+			draw_list->AddText(pos, 0xFFFFFFFF, text.str().c_str());
+		}
+		ImGui::PopFont();
 
 		//static float arr[] = { 0.6f, 0.1f, 1.0f, 0.5f, 0.92f, 0.1f, 0.2f };
 		//ImGui::PlotLines("Frame Times", arr, IM_ARRAYSIZE(arr));
