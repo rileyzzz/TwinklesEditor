@@ -68,16 +68,19 @@ public:
 	
 	std::vector<EditEmitter> EditEmitters;
 
-	int32_t selectedEmitter = -1;
+	
 	int32_t selectedFrame = -1;
+	int32_t lastSelectedFrame = -1;
 	float activeEditMax = 1.0f;
 	//std::pair<float, float>* selectedFramePtr = nullptr;
 	//std::pair<float, float>* selectedFloatFrame = nullptr;
 
+	EditEmitter* selectedEmitter = nullptr;
 	KeyframeTrackBase* selectedTrack = nullptr;
 
 	//Widgets
 	void DrawOutliner();
+	void DrawProperties();
 	void DrawGraph();
 };
 

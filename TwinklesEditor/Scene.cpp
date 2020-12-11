@@ -222,6 +222,8 @@ void Scene::ResizeScene(int inWidth, int inHeight)
 
 RenderEmitter::RenderEmitter(Emitter& emit, Scene* InScene) : SourceEmitter(emit), parentScene(InScene)
 {
+	emit.renderEmitter = this;
+
 	particleShader = parentScene->particleShader;
 
 	KUID& TexKUID = SourceEmitter.TextureKUID;
@@ -497,18 +499,27 @@ void RenderEmitter::DrawParticles()
 	//for (auto& particle : sorted)
 	//	FinalArray.push_back(particle.second);
 
+	std::vector<std::pair<float, RenderParticle*>> sorted;
+	glm::mat4 inverse = glm::inverse(parentScene->view);
+	glm::vec3 camerapos = glm::vec3(inverse[3]);
+	for (auto& particle : particles)
+	{
+		if (particle.Life > 0.0f)
+		{
+			float distance = glm::length(particle.Position - camerapos);
+			sorted.emplace_back(distance, &particle);
+		}
+	}
+
+	std::sort(sorted.rbegin(), sorted.rend());
+	std::vector<RenderParticle> renderParticles;
+	for (const auto& particle : sorted)
+		renderParticles.push_back(*particle.second);
+
 	glBindBuffer(GL_ARRAY_BUFFER, EmitterVBO);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(RenderParticle) * particleCount, &particles[0]);
-	//glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(RenderParticle) * FinalArray.size(), &FinalArray[0]);
-
-	//glm::mat4 modelview;
-	//glm::mat4 proj;
-	//glGetFloatv(GL_MODELVIEW_MATRIX, glm::value_ptr(modelview));
-	//glGetFloatv(GL_PROJECTION_MATRIX, glm::value_ptr(proj));
+	if(renderParticles.size()) glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(RenderParticle) * renderParticles.size(), &renderParticles[0]);
 
 
-	//Additive blending
-	//glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 	particleShader->use();
 
 	particleShader->setMat4("view", parentScene->view);
@@ -519,7 +530,7 @@ void RenderEmitter::DrawParticles()
 	glBindVertexArray(EmitterVAO);
 	//glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, particleCount);
 	//glDrawArraysInstanced(GL_POINTS, 0, 1, particleCount);
-	glDrawArrays(GL_POINTS, 0, particleCount);
+	glDrawArrays(GL_POINTS, 0, renderParticles.size());
 	glBindVertexArray(0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	//glBegin(GL_POINTS);

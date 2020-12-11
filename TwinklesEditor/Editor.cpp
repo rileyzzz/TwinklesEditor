@@ -131,9 +131,18 @@ Editor::Editor(int argc, char** argv)
 			ImGuiWindowFlags_NoSavedSettings);
 		DrawOutliner();
 		ImGui::End();
-		
+
 		int w, h;
 		SDL_GetWindowSize(window, &w, &h);
+		constexpr int propertiesWidth = 200;
+		ImGui::SetNextWindowPos(ImVec2(w - propertiesWidth, 25), ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(propertiesWidth, scrh - 200 - 20), ImGuiCond_FirstUseEver);
+		ImGui::Begin("Properties", nullptr,
+			ImGuiWindowFlags_NoSavedSettings);
+		DrawProperties();
+		ImGui::End();
+		
+		
 		static int GraphHeight = 200;
 
 		//ImVec2 windowSize = ImVec2(scrw, scrh);
@@ -208,7 +217,7 @@ void Editor::Draw()
 					//LoadMesh(szFile);
 					ParticleScene->OpenFile(szFile);
 					auto& emitters = ParticleScene->ActiveSystem.Emitters;
-					selectedEmitter = -1;
+					selectedEmitter = nullptr;
 					selectedTrack = nullptr;
 					EditEmitters.clear();
 					for (auto& emit : emitters)
@@ -266,7 +275,7 @@ void Editor::DrawOutliner()
 
 	//auto& emitters = ParticleScene->ActiveSystem.Emitters;
 
-	for (const auto& emit : EditEmitters)
+	for (auto& emit : EditEmitters)
 	{
 		Emitter* SourceEmitter = emit.SourceEmitter;
 		std::string uniqueName = "Emitter " + std::to_string(emit.ID);
@@ -284,11 +293,118 @@ void Editor::DrawOutliner()
 
 				if (ImGui::IsItemClicked())
 				{
-					selectedEmitter = emit.ID;
+					selectedEmitter = &emit;
 					selectedTrack = track;
 				}
 			}
 			ImGui::TreePop();
+		}
+	}
+}
+
+inline void InputKUID(KUID& TextureKUID)
+{
+	bool hasRevision = (TextureKUID.Revision != 0);
+	if (ImGui::Checkbox("Is KUID2?", &hasRevision))
+		TextureKUID.Revision = hasRevision ? 1 : 0;
+
+	//ImGui
+	bool changed = false;
+
+	char UserID[255];
+	char ContentID[255];
+	strcpy_s(UserID, std::to_string(TextureKUID.UserID).c_str());
+	strcpy_s(ContentID, std::to_string(TextureKUID.ContentID).c_str());
+
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+	constexpr float inputWidth = 100.0f;
+	if (!hasRevision)
+		ImGui::Text("<kuid:");
+	else
+		ImGui::Text("<kuid2:");
+	ImGui::SameLine();
+
+	ImGui::PushItemWidth(inputWidth);
+	changed |= ImGui::InputText("##userid", &UserID[0], sizeof(UserID));
+	ImGui::PopItemWidth();
+
+	ImGui::SameLine();
+	ImGui::Text(":");
+	ImGui::SameLine();
+
+	ImGui::PushItemWidth(inputWidth);
+	changed |= ImGui::InputText("##contentid", &ContentID[0], sizeof(ContentID));
+	ImGui::PopItemWidth();
+
+	ImGui::SameLine();
+
+	if (hasRevision)
+	{
+		ImGui::Text(":");
+		ImGui::SameLine();
+		char RevisionID[255];
+		strcpy_s(RevisionID, std::to_string(TextureKUID.Revision).c_str());
+		ImGui::PushItemWidth(20.0f);
+		if (ImGui::InputText("##revisionid", &RevisionID[0], sizeof(RevisionID)))
+		{
+			try { TextureKUID.Revision = std::stoul(RevisionID); }
+			catch(...) { TextureKUID.Revision = 0; }
+		}
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+	}
+	ImGui::Text(">");
+	ImGui::PopStyleVar();
+
+	if (changed)
+	{
+		try { TextureKUID.UserID = std::stoi(UserID); }
+		catch (...) { TextureKUID.UserID = 0; }
+		try { TextureKUID.ContentID = std::stoi(ContentID); }
+		catch (...) { TextureKUID.ContentID = 0; }
+	}
+}
+
+
+void Editor::DrawProperties()
+{
+	if (selectedEmitter)
+	{
+		Emitter* src = selectedEmitter->SourceEmitter;
+		RenderEmitter* renderEmitter = src->renderEmitter;
+
+		ImGui::Text("Material:");
+
+		ImGui::Text("KUID:");
+		InputKUID(src->TextureKUID);
+		//ImGui::Checkbox("KUID2?", );
+
+		
+		//ImGui::InputText();
+		//ImGui::InputText
+
+
+		ImGui::Text("Preview Texture:");
+		//ImGui::Image((ImTextureID)renderEmitter->SpriteTex, ImVec2(128, 128), ImVec2(0, 1), ImVec2(1, 0));
+		
+		if (ImGui::ImageButton((ImTextureID)renderEmitter->SpriteTex, ImVec2(128, 128), ImVec2(0, 1), ImVec2(1, 0), -1, ImVec4(0.0f, 0.0f, 0.0f, 1.0f)))
+		{
+			char szFile[255];
+			OPENFILENAMEA ofn;
+			ZeroMemory(&ofn, sizeof(ofn));
+			ofn.lStructSize = sizeof(ofn);
+			ofn.hwndOwner = NULL;
+			ofn.lpstrFile = szFile;
+			ofn.lpstrFile[0] = '\0';
+			ofn.nMaxFile = sizeof(szFile);
+			ofn.lpstrFilter = "Image Files (*.png;*.tga;*.bmp;*.hdr;*.dds)\0*.png;*.tga;*.bmp;*.hdr;*.dds\0All Files (*.*)\0*.*\0";
+			ofn.nFilterIndex = 1;
+			ofn.lpstrFileTitle = NULL;
+			ofn.nMaxFileTitle = 0;
+			ofn.lpstrInitialDir = NULL;
+			ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+			if (GetOpenFileNameA(&ofn))
+				renderEmitter->SetTexture(szFile);
 		}
 	}
 }
@@ -318,15 +434,20 @@ inline bool InsideContainer(ImVec2 test, ImVec2 a, ImVec2 b)
 	return test.x > a.x && test.y > a.y && test.x < b.x && test.y < b.y;
 }
 
+
 void Editor::DrawGraph()
 {
 	if (selectedTrack)
 	{
 		ImGui::Text(selectedTrack->name.c_str());
-		EditEmitter& emit = EditEmitters[selectedEmitter];
+		EditEmitter& emit = *selectedEmitter;
 		
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.2f, 0.2f, 0.2f, 0.25f));
-		ImGui::BeginChild("Graph", ImVec2(-64.0f, 0.0f), true);
+
+		float rightMargin = -64.0f;
+		if (lastSelectedFrame != -1)
+			rightMargin = -300.0f;
+		ImGui::BeginChild("Graph", ImVec2(rightMargin, 0.0f), true);
 		ImVec2 size = ImGui::GetWindowContentRegionMax();
 		ImVec2 windowPos = ImGui::GetWindowPos();
 		ImVec2 contentMin = ImGui::GetWindowContentRegionMin();
@@ -372,7 +493,7 @@ void Editor::DrawGraph()
 			draw_list->AddLine(ImVec2(windowPos.x, y), ImVec2(windowPos.x + size.x, y), lineColor);
 		}
 
-		
+		ImVec2 mousePos = ImGui::GetMousePos();
 
 		if (selectedTrack->type == typeid(float))
 		{
@@ -380,14 +501,11 @@ void Editor::DrawGraph()
 			auto& Frames = Track->Frames;
 
 
-			ImVec2 mousePos = ImGui::GetMousePos();
-
 			std::vector<size_t> sortedMap(Frames.size());
 			std::iota(sortedMap.begin(), sortedMap.end(), 0);
 			std::sort(sortedMap.begin(), sortedMap.end(),
 				[Frames](size_t a, size_t b) { return Frames[a].first < Frames[b].first; });
 
-			//static std::pair<float, float>* selectedFramePtr = nullptr;
 
 			for (uint32_t i = 0; i < Frames.size(); i++)
 			{
@@ -480,6 +598,113 @@ void Editor::DrawGraph()
 				selectedFrame = std::find(Frames.begin(), Frames.end(), FrameCopy) - Frames.begin();
 			}
 		}
+		else if (selectedTrack->type == typeid(TColor))
+		{
+			auto* Track = dynamic_cast<KeyframeTrack<TColor>*>(selectedTrack);
+			auto& Frames = Track->Frames;
+
+			std::vector<size_t> sortedMap(Frames.size());
+			std::iota(sortedMap.begin(), sortedMap.end(), 0);
+			std::sort(sortedMap.begin(), sortedMap.end(),
+				[Frames](size_t a, size_t b) { return Frames[a].first < Frames[b].first; });
+
+			for (uint32_t i = 0; i < Frames.size(); i++)
+			{
+				auto& frame = Frames[i];
+
+				float x = frame.first * size.x;
+				float y = (1.0f - frame.second.a / 255.0f) * size.y;
+				
+				auto next = Track->GetNextFrame(frame.first);
+				if (next.first != frame.first)
+				{
+					float nextx = next.first * size.x;
+
+					ImVec2 rectMin(windowPos.x + x, windowPos.y + size.y);
+					ImVec2 rectMax(windowPos.x + nextx, windowPos.y + 0.0f);
+					uint32_t ColorA = frame.second.ToHex();
+					uint32_t ColorB = next.second.ToHex();
+
+					draw_list->AddRectFilledMultiColor(rectMin, rectMax, ColorA, ColorB, ColorB, ColorA);
+				} 
+
+				ImVec2 lineStart(windowPos.x + x, windowPos.y);
+				//ImVec2 lineCenter(windowPos.x + x, windowPos.y + size.y / 2.0f);
+				ImVec2 lineCenter(windowPos.x + x, windowPos.y + y);
+				ImVec2 lineEnd(windowPos.x + x, windowPos.y + size.y);
+				draw_list->AddLine(lineStart, lineEnd, 0xFF08D4D4, 2.0f);
+				DrawEditCursor(lineCenter, lastSelectedFrame == sortedMap[i]);
+
+
+
+				if (selectedFrame == -1 && ImGui::IsItemActive()) //selectedFrame == -1 
+				{
+					//float dist = std::hypotf(pos.x - mousePos.x, pos.y - mousePos.y);
+					float dist = std::abs((windowPos.x + x) - mousePos.x);
+
+					if (dist < 15.0f)
+					{
+						selectedFrame = sortedMap[i];
+						lastSelectedFrame = selectedFrame;
+						activeEditMax = maxHeight;
+						//selectedFramePtr = &frame;
+						//std::cout << "now selected " << selectedFrame << "\n";
+					}
+				}
+			}
+
+			bool MouseInside = InsideContainer(mousePos, windowPos, screenContentMax);
+			if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && MouseInside)
+			{
+				float first = (mousePos.x - windowPos.x) / size.x;
+				auto last = Track->GetLastFrame(first);
+				auto next = Track->GetNextFrame(first);
+				TColor second = lerp(last.second, next.second, first - last.first);
+				selectedFrame = Frames.size();
+				Frames.emplace_back(first, second);
+			}
+
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && selectedFrame == -1 && MouseInside)
+			{
+				for (auto& frame : Frames)
+				{
+					if (frame.first != 0.0f && frame.first != 1.0f)
+					{
+						float x = frame.first * size.x;
+						float dist = std::abs((windowPos.x + x) - mousePos.x);
+
+						if (dist < 15.0f)
+						{
+							std::remove(Frames.begin(), Frames.end(), frame);
+							break;
+						}
+					}
+				}
+			}
+
+			if (selectedFrame != -1)
+			{
+				auto& editFrame = Frames[selectedFrame];
+				if (editFrame.first != 0.0f && editFrame.first != 1.0f)
+				{
+					editFrame.first += (ImGui::GetIO().MouseDelta.x / size.x);
+					editFrame.first = std::clamp(editFrame.first, 0.001f, 0.999f);
+				}
+
+				//(1.0f - frame.second.a / 255.0f) * size.y;
+				//(1.0f - (mouseY / size.y)) * 255.0f
+				float alphaDelta = (ImGui::GetIO().MouseDelta.y * 255.0f) / size.y;
+				float newAlpha = (float)editFrame.second.a - alphaDelta;
+				newAlpha = std::clamp(newAlpha, 0.0f, 255.0f);
+				editFrame.second.a = (uint8_t)newAlpha;
+				
+
+				auto FrameCopy = Frames[selectedFrame];
+				std::sort(Frames.begin(), Frames.end());
+				selectedFrame = std::find(Frames.begin(), Frames.end(), FrameCopy) - Frames.begin();
+				lastSelectedFrame = selectedFrame;
+			}
+		}
 		//ImGui::EndChild();
 		//ImGui::PopStyleColor();
 
@@ -509,6 +734,26 @@ void Editor::DrawGraph()
 			draw_list->AddText(pos, 0xFFFFFFFF, text.str().c_str());
 		}
 		ImGui::PopFont();
+
+		//color selection
+		if (lastSelectedFrame != -1)
+		{
+			ImGui::SameLine();
+			ImGui::BeginChild("Edit", ImVec2(-rightMargin, 0.0f), true);
+			if (selectedTrack->type == typeid(TColor))
+			{
+				auto* Track = dynamic_cast<KeyframeTrack<TColor>*>(selectedTrack);
+				auto& Frames = Track->Frames;
+				TColor& color = Frames[lastSelectedFrame].second;
+
+				ImVec4 colorFloat = ImGui::ColorConvertU32ToFloat4(color.ToHex());
+				
+				ImGui::ColorPicker4("Color", &colorFloat.x);
+				color.FromHex(ImGui::ColorConvertFloat4ToU32(colorFloat));
+			}
+			ImGui::EndChild();
+		}
+
 
 		//static float arr[] = { 0.6f, 0.1f, 1.0f, 0.5f, 0.92f, 0.1f, 0.2f };
 		//ImGui::PlotLines("Frame Times", arr, IM_ARRAYSIZE(arr));

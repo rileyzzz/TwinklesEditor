@@ -139,7 +139,46 @@ struct TColor
 	{
 		return glm::vec4((float)r / 255.0f, (float)g / 255.0f, (float)b / 255.0f, (float)a / 255.0f);
 	}
+
+	uint32_t ToHex()
+	{
+		//ABGR
+		uint32_t Color = 0;
+		Color |= r;
+		Color |= g << 8;
+		Color |= b << 16;
+		Color |= a << 24;
+		return Color;
+	}
+
+	void FromHex(uint32_t color)
+	{
+		uint8_t* colorPtr = (uint8_t*)&color;
+		r = colorPtr[0];
+		g = colorPtr[1];
+		b = colorPtr[2];
+		a = colorPtr[3];
+	}
+
+	bool operator==(const TColor& other) const
+	{
+		return r == other.r && g == other.g && b == other.b && a == other.a;
+	}
+	bool operator<(const TColor& other) const
+	{
+		return r < other.r && g < other.g && b < other.b && a < other.a;
+	}
 };
+
+float lerp(float a, float b, float f);
+Vector2 lerp(const Vector2& a, const Vector2& b, float f);
+Vector3 lerp(const Vector3& a, const Vector3& b, float f);
+TColor lerp(const TColor& a, const TColor& b, float f);
+
+//bool operator==(const std::pair<float, TColor>& A, const std::pair<float, TColor>& B)
+//{
+//	return A.first == B.first && A.second == B.second;
+//}
 
 //template <class T>
 //struct Keyframe
@@ -238,6 +277,8 @@ public:
 	T GetKey(float time);
 };
 
+class RenderEmitter;
+
 class Emitter
 {
 public:
@@ -263,9 +304,9 @@ public:
 	KeyframeTrack<float> WindFactor = KeyframeTrack<float>("Wind Factor");
 	Vector3 VelocityDampening;
 
-
 	bool Serialize(IOArchive& Ar, uint32_t Version);
-
+	
+	RenderEmitter* renderEmitter;
 	//float GetFloatKey(float time, KeyframeTrack<float>& Track);
 	//Vector3 GetVectorKey(float time, KeyframeTrack<Vector3>& Track);
 };

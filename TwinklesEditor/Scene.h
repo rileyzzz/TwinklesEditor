@@ -70,10 +70,11 @@ private:
 	uint32_t EmitterVAO;
 
 	bool TextureLoaded = false;
-	uint32_t SpriteTex;
 
 	Scene* parentScene;
 public:
+	uint32_t SpriteTex;
+
 	bool ShowEmitterSize = true;
 	bool ShowVelocityCone = true;
 
